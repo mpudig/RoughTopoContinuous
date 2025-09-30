@@ -27,8 +27,8 @@ H = Params.H
 
       ### Background parameters ###
 
-f₀ = Params.f0
-β = Params.beta
+f₀ = Params.f₀
+β = Params.β
 g = Params.g
 μ = Params.μ
 
