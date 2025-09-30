@@ -1,4 +1,4 @@
-# Parameters for two layer flows using GeophysicalFlows.jl
+### Parameters for multi-layer QG turbulence simulations with small-scale topography and linear stratification ###
 
 module Params
 
@@ -11,81 +11,76 @@ using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Ru
 # local import
 import .Utils
 
+		### Save path and device ###
 
-
-  	 ### Save path and device ###
-
-# format: kappa_star = 0.1, Ktopo = 25, h_star = 1
-expt_name = "/kappa01_kt25_h1"
-path_name = "/scratch/mp6191/GeophysicalFlows_expts" * expt_name * "/output" * expt_name * ".jld2"
+# format: nz = ..., kappa = ..., h = ...
+expt_name = "/nz4_r02_h0"
+path_name = "/scratch/mp6191/RoughTopoContinous" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
 
-	 ### Grid ###
+		### Resolution ###
 
-nx = 1024           # number of x grid cells
-Ld = 15e3           # deformation radius
-ld = 2 * pi * Ld    # deformation wavelength
-Kd = 1 / Ld         # deformation wavenumber
-Lx = 25 * ld        # side length of square domain
+nx = 512             # number of x, y grid points
+nz = 4               # number of z grid points
 
-nz = 2                         # number of z layers
-H0 = 4000.                     # total rest depth of fluid
-delta = 1.                     # ratio of layer 1 to layer 2
-H1 = delta / (1 + delta) * H0  # rest depth of layer 1
-H2 = 1 / (1 + delta) * H0      # rest depth of layer 2
-H = [H1, H2]                   # rest depth of each layer
+    	### Control parameters ###
 
+r_star = 0.2		  # nondimensional drag coefficient, r* = rf₀λ/UH
+h_star = 0.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
+β_star = 0.			  # nondimensional beta, β* = βλ²/U
 
-    	 ### Control parameters ###
+		### Domain ###
 
-beta_star = 0.      # nondimensional β, β* = βλ^2/U
-kappa_star = 0.1    # nondimensional κ, κ* = κλ/U
-h_star = 5.         # nondimensional advection-topography, h* = f_0 * h_0 / (U * H * K_t)
+Ld = 20e3           # first baroclinic deformation radius [m]
+Kd = 1 / Ld         # first baroclinic deformation wavenumber [m-1]
+ld = 2 * pi * Ld    # first baroclinic deformation wavelength [m]
+Lx = 15 * ld        # side length of square domain [m]
 
-
-
-    	 ### Planetary parameters ###
-
-U0 = 0.01              						     # mean shear strength
-U = [2 * U0, 0 * U0]   						     # velocity in each layer
-
-f0 = 1e-4                                        # constant Coriolis
-beta = U0 / Ld^2 * beta_star                     # y gradient of Coriolis
-
-g = 9.81                                         # gravity
-rho0 = 1000.                                     # reference density
-rho1 = rho0 + 25.                                # layer 1 density
-rho2 = rho1 / (1 - (4 * f0^2 * Ld^2) / (g * H0)) # layer 2 density given the deformation radius and other parameters
-rho = [rho1, rho2]							     # density in each layer
-# b = -g / rho0 .* [rho1, rho2]
-
-kappa = 2 * U0 / Ld * kappa_star	             # linear Ekman drag, the factor of 2 is to be consistent with Gallet Ferrari (and Thompson Young)
-
-      	   ### Topography ###
-	   
-Ktopo = 25 * (2 * pi / Lx)							        # topographic wavenumber
-hrms = h_star * U0 * H0 * Ktopo / f0                        # rms topographic height 
-h = Utils.monoscale_random(hrms, Ktopo, Lx, nx, dev)        # random monoscale topography
-#h = Utils.goff_jordan_iso(h_star, f0, U0, H0, Lx, nx, dev) # random Goff Jordan topography
-eta = f0 / H2 .* h                                          # bottom layer topographic PV
+H₀ = 4000.                      # total mean depth [m]
+Hᵢ = H₀ / nz                    # equal height of each layer [m]
+H =  Hᵢ .* ones(nz)             # array of layer heights
+z = range(0., -H₀, nz + 1)      # vertical cell edges
+zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 
 
+    	### Background scalar parameters ###
 
-      	   ### Time stepping ###
+U₀ = 1e-2              			    # baroclinic shear [m s-1]
+f₀ = 1e-4                           # constant Coriolis [s-1]
+β = U₀ * β_star / Ld^2			    # y gradient of Coriolis [m-1 s-1]
+g = 9.81                            # gravity [m2 s-1]
+N₀ = Utils.LinStrat(f₀, H₀, Ld)	    # buoyancy frequency magnitude for given deformation radius, etc [s-1]
+r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
+μ = f₀ / H[end] * r 			    # bottom layer drag [s-1]
 
-Ti = Ld / U0               # nondimensional time
-tmax = 600 * Ti            # final time in seconds
-dt = 60 * 3.               # time step in seconds
-dtsnap = 60 * 60 * 24 * 5  # snapshot frequency in seconds
-nsubs = Int(dtsnap / dt)   # number of time steps between snapshots
-nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs  # total number of model steps, nsubs should divide nsteps
-stepper = "FilteredRK4"   # timestepper
+
+		### Background profiles ###
+
+ϕ₁ = sqrt(2) * cos(N₀ / (Ld * f₀) * zc)      # first baroclinic vertical mode
+U = U₀ * ϕ₁ - U₀ * ϕ₁[end] 					 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
+b = N₀^2 .* zc             				     # background buoyancy profile given constant N₀ [m s-2]
+
+      	### Topography ###
+
+#hrms = h_star * U₀ * H₀ * Ktopo / f₀                        # rms topographic height [m]
+#h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Lx, nx, dev)   # random Goff Jordan topography [m]
+#eta = f₀ / H[end] .* h                                      # bottom layer topographic PV [s-1]
+
+      	### Time stepping ###
+
+Ti = Ld / U0                							    # nondimensional time
+tmax = 400 * Ti          						            # final time [s]
+dt = 60 * 12.                                               # time step [s]]
+dtsnap = 60 * 60 * 24 * 100    							    # snapshot frequency [s]
+nsubs = Int(dtsnap / dt)     							    # number of time steps between snapshots
+nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs    # total number of model steps, nsubs should divide nsteps
+stepper = "FilteredRK4"   								    # timestepper
 
 
 			### Initial condition ###
 
-K0 = 1 / (4 * Ld)          # most unstable Eady wavenumber, Km = 2 * pi / (4 * Ld) (see Vallis)
-E0 = 1e-5                  # total average initial energy
+K0 = 1 / (4 * Ld)          # most unstable Eady wavenumber, Km = 2 * pi / (4 * Ld) (see Vallis text)
+E0 = 1e-5                  # total average initial energy [m2 s-2]
 
 end

@@ -1,4 +1,4 @@
-# Some useful extra functions for running my experiments in GeophysicalFlows
+# Some useful extra functions for running my experiments with GeophysicalFlows.jl
 
 module Utils
 
@@ -7,650 +7,312 @@ using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Ru
 using FourierFlows: parsevalsum
 
 """
-	monoscale_random(hrms, Ktopo, Lx, nx, dev, T)
+	MonoscaleTopo(hrms, Ktopo, Lx, nx, dev, T)
 
 Returns a 2D topography field defined by a single length scale with random phases. 
 """
 
-function monoscale_random(hrms, Ktopo, Lx, nx, dev)
+function MonoscaleTopo(hrms, Ktopo, Lx, nx, dev)
 
-	 # Wavenumber grid
-	 nk = Int(nx / 2 + 1)
-	 nl = nx
-	
-	 dk = 2 * pi / Lx
-	 dl = dk
-	 
-	 k = reshape( rfftfreq(nx, dk * nx), (nk, 1) )
-	 l = reshape( fftfreq(nx, dl * nx), (1, nl) )
-
-	 K = @. sqrt(k^2 + l^2)
-
-	 # Isotropic Gaussian in wavenumber space about mean, Ktopo, with standard deviation, sigma
-	 # with random Fourier phases
-	 sigma = sqrt(2) * dk
-
-	 Random.seed!(1234)
-	 hh = exp.(-(K .- Ktopo).^2 ./ (2 * sigma^2)) .* exp.(2 * pi * im .* rand(nk, nl))
-
-	 # Recover h from hh
-	 h = irfft(hh, nx)
-
-	 c = hrms / sqrt.(mean(h.^2))
-	 h = c .* h
-
-	 return h
-end
-
-"""
-	goff_jordan_iso(hrms, Ktopo, Lx, nx, dev, T)
-
-Returns a 2D, isotropic topography field defined by the Goff Jordan spectrum with random phases. 
-"""
-
-function goff_jordan_iso(h_star, f0, U0, H0, Lx, nx, dev)
-
-	 # Wavenumber grid
-	 nk = Int(nx / 2 + 1)
-	 nl = nx
-	
-	 dk = 2 * pi / Lx
-	 dl = dk
-	 
-	 k = reshape( rfftfreq(nx, dk * nx), (nk, 1) )
-	 l = reshape( fftfreq(nx, dl * nx), (1, nl) )
-
-	 K = @. sqrt(k^2 + l^2)
-
-	 # Goff Jordan spectrum assuming isotropy
-	 mu = 3.5
-	 k0 = 1.8e-4
-	 l0 = 1.8e-4
-
-	 Random.seed!(1234)
-	 hspec = @. 2 * pi * (mu - 2) / (k0 * l0) * (1 + (k / k0)^2 + (l / l0)^2)^(-mu / 2)
-	 hh = hspec .* exp.(2 * pi * im .* rand(nk, nl))
-
-	 # Recover h from hh
-	 h = irfft(hh, nx)
-
-	 # Get peak in topographic spectrum for calculating h_*
-	 dhdx = irfft(im .* k .* hh, nx)
-	 dhdy = irfft(im .* l .* hh, nx)
-	 Ktopo = sqrt(mean(dhdx.^2 .+ dhdy.^2)) / sqrt(mean(h.^2))
-	 
-	 # Get hrms for given h_star, and scale h
-	 hrms = h_star * U0 * H0 * Ktopo / f0
-	 c = hrms / sqrt.(mean(h.^2))
-	 h = c .* h
-
-	 return h
-end
-
-
-"""
-	set_initial_condition!(prob, grid, K0, E0)
-
-	Sets the initial condition of MultiLayerQG to be a random q(x,y) field with baroclinic structure
-	and with energy localized in spectral space about K = K0 and with total kinetic energy equal to E0
-"""
-
-function set_initial_condition!(prob, E0, K0, Kd)
-	params = prob.params
-	grid = prob.grid
-	vars = prob.vars
-	dev = grid.device
-	T = eltype(grid)
-	A = device_array(dev)
-
-	# Grid
-	nx = grid.nx
-	Lx = grid.Lx
-
+	# Wavenumber grid
 	nk = Int(nx / 2 + 1)
 	nl = nx
-
+	
 	dk = 2 * pi / Lx
 	dl = dk
-
+	 
 	k = reshape( rfftfreq(nx, dk * nx), (nk, 1) )
 	l = reshape( fftfreq(nx, dl * nx), (1, nl) )
 
-	K2 = @. k^2 + l^2
-	K = @. sqrt(K2)
+	K = @. sqrt(k^2 + l^2)
 
-	# Isotropic Gaussian in wavenumber space about mean, K0, with standard deviation, sigma
+	# Isotropic Gaussian in wavenumber space about mean, Ktopo, with standard deviation, sigma
+	# with random Fourier phases
 	sigma = sqrt(2) * dk
 
+	Random.seed!(1234)
+	hh = exp.(-(K .- Ktopo).^2 ./ (2 * sigma^2)) .* exp.(2 * pi * im .* rand(nk, nl))
+
+	# Recover h from hh
+	h = irfft(hh, nx)
+
+	c = hrms / sqrt.(mean(h.^2))
+	h = c .* h
+
+	return h
+end
+
+"""
+        GoffJordanTopo(h_star, f0, U0, H0, Ktopo, Lx, nx, dev)
+
+Returns a 2D, isotropic topography field defined by the Goff Jordan spectrum with random phases.
+"""
+
+function GoffJordanTopo(h_star, f0, U0, H0, Ktopo, Lx, nx, dev)
+
+    # Wavenumber grid
+    nk = Int(nx / 2 + 1)
+    nl = nx
+
+    dk = 2 * pi / Lx
+    dl = dk
+
+    k = reshape( rfftfreq(nx, dk * nx), (nk, 1) )
+    l = reshape( fftfreq(nx, dl * nx), (1, nl) )
+
+    K = @. sqrt(k^2 + l^2)
+
+    # Goff Jordan spectrum assuming isotropy, bandpass filtered for Ktopo < K < K_c * Ktopo
+	# Kmin = Ktopo sets peak of isotropic power spectrum
+	# Kmax = 6 / dx (where dx = Lx / nx), based on having at least 6 grid points to resolve the smallest scales
+	Kmin = Ktopo
+	Kax = 6 / (Lx / nx)
+
+	mu = 3.5
+    k0 = Ktopo * sqrt(mu - 1)
+    l0 = k0
+
+    Random.seed!(1234)
+    hspec = @. (1 + (k / k0)^2 + (l / l0)^2)^(-mu / 2)
+    hpf = ifelse.(K .> Ktopo, K ./ K, 0 .* K)
+    lpf = ifelse.(K .< K_c * Ktopo, K ./ K, 0 .* K)
+    CUDA.@allowscalar lpf[1, 1] = 1.
+    bpf = lpf .* hpf
+    hh = bpf .* sqrt.(hspec) .* exp.(2 * pi * im .* rand(nk, nl))
+
+    # Recover h from hh
+    h = irfft(hh, nx)
+
+	# Get hrms for given h_star, and scale h
+    hrms = h_star * U0 * H0 * Ktopo / f0
+    c = hrms / sqrt.(mean(h.^2))
+    h = c .* h
+
+    return h
+end
+
+"""
+        set_initial_condition!(prob, grid, K₀, E₀, ϕ₁)
+
+        Sets the initial condition of MultiLayerQG to be a random q(x,y) field with baroclinic structure ϕ₁
+        and with energy localized in spectral space about K = K₀ and with total energy equal to E₀
+"""
+function set_initial_condition!(prob, grid, K₀, E₀, ϕ₁)
+    params = prob.params
+     grid = prob.grid
+    vars = prob.vars
+    dev = grid.device
+    T = eltype(grid)
+    A = device_array(dev)
+
+    # Grid
+    nx = grid.nx
+    Lx = grid.Lx
+    nz = params.nlayers
+
+    nk = Int(nx / 2 + 1)
+    nl = nx
+
+    dk = 2 * pi / Lx
+    dl = dk
+
+    k = reshape( rfftfreq(nx, dk * nx), (nk, 1) )
+    l = reshape( fftfreq(nx, dl * nx), (1, nl) )
+
+    K2 = @. k^2 + l^2
+    K = @. sqrt(K2)
+
+    # Isotropic Gaussian in wavenumber space about mean, K0, with standard deviation, sigma
+    sigma = sqrt(2) * dk
+
 	Random.seed!(4321)
-	psihmag = exp.(-(K .- K0).^2 ./ (2 * sigma^2)) .* exp.(2 * pi * im .* rand(nk, nl))
+    psihmag = exp.(-(K .- K0).^2 ./ (2 * sigma^2)) .* exp.(2 * pi * im .* rand(nk, nl))
 
-	psih = zeros(nk, nl, 2) .* im
-	psih[:,:,1] = psihmag
-	psih[:,:,2] = -1 .* psihmag
+    # Give initial condition first baroclinic structure
+    psih = zeros(nk, nl, nz) .* im
+    for j = 1:nz
+        psih[:, :, j] = psihmag .* phi1[j]
+    end
 
-	# Calculate KE and APE, and prescribe mean total energy
-	H = params.H
-	V = grid.Lx * grid.Ly * sum(H)
-	f0, gp = params.f₀, params.g′
-	
-	abs²∇𝐮h = zeros(nk, nl, 2) .* im
-    abs²∇𝐮h[:,:,1] = K2 .* abs2.(psih[:,:,1])
-    abs²∇𝐮h[:,:,2] = K2 .* abs2.(psih[:,:,2])
+    # Calculate KE and APE, and prescribe mean total energy
+    H = params.H
+    V = grid.Lx * grid.Ly * sum(H)
+    f0, gp = params.f₀, params.g′
 
-    KE = 1 / (2 * V) * (parsevalsum(abs²∇𝐮h[:,:,1], grid) * H[1] + parsevalsum(abs²∇𝐮h[:,:,1], grid) * H[2])
-    APE = 1 / (2 * V) * f0^2 / gp * parsevalsum(abs2.(psih[:,:,1] .- psih[:,:,2]), grid)
-    E = KE + APE
+    abs²∇𝐮h = zeros(nk, nl, nz) .* im
+    for j = 1:nz
+        abs²∇𝐮h[:, :, j] = K2 .* abs2.(psih[:, :, j])
+    end
+
+    KE, PE = zeros(nz), zeros(nz - 1)
+
+    for j = 1 : nz
+        KE[j] = 1 / (2 * V) * parsevalsum(view(abs²∇𝐮h, :, :, j), grid) * params.H[j]
+    end
+
+	for j = 1 : nz-1
+        PE[j] = 1 / (2 * V) * params.f₀^2 ./ params.g′[j] .* parsevalsum(abs2.(view(psih, :, :, j) .- view(psih, :, :, j + 1)), grid)
+    end
+
+    E = sum(KE) + sum(PE)
     c = sqrt(E0 / E)
     psih = @. c * psih
+    psih = A(psih)
 
     # Invert psih to get qh, then transform qh to real space qh
-    qh = zeros(nk, nl, 2) .* im
-    qh[:,:,1] = - K2 .* psih[:,:,1] .+ f0^2 / (gp * H[1]) .* (psih[:,:,2] .- psih[:,:,1])
-    qh[:,:,2] = - K2 .* psih[:,:,2] .+ f0^2 / (gp * H[2]) .* (psih[:,:,1] .- psih[:,:,2])
+    qh = A(zeros(nk, nl, nz)) .* im
+    MultiLayerQG.pvfromstreamfunction!(qh, psih, params, grid)
 
-    q = zeros(nx, nx, 2)
-    q[:,:,1] = irfft(qh[:,:,1], nx)
-    q[:,:,2] = irfft(qh[:,:,2], nx)
+    q = A(zeros(nx, nx, nz))
+    invtransform!(q, qh, params)
 
     # Set as initial condition
-    MultiLayerQG.set_q!(prob, A(q))
+    MultiLayerQG.set_q!(prob, q)
 end
 
-### Calculate diagnostics ###
+"""
+        LinStrat(f₀, H, Ld)
 
-function calc_KE(prob)
-		vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
-		nlayers = 2
-		KE = zeros(nlayers)
-			
-		@. vars.qh = sol
-		MultiLayerQG.streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
-			
-		abs²∇𝐮h = vars.uh        # use vars.uh as scratch variable
-		@. abs²∇𝐮h = grid.Krsq * abs2(vars.ψh)
-			
-		V = grid.Lx * grid.Ly * sum(params.H)
-			
-		ψ1h, ψ2h = view(vars.ψh, :, :, 1), view(vars.ψh, :, :, 2)
-			
-		for j = 1:nlayers
-			  view(KE, j) .= 1 / (2 * V) * parsevalsum(view(abs²∇𝐮h, :, :, j), grid) * params.H[j]
-		end
-			  
-		return KE
-end
-  
-function calc_APE(prob)
-		vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
-			
-		V = grid.Lx * grid.Ly * sum(params.H)
+Returns linear stratification for given first baroclinic deformation radius
+"""
 
-		ψ1h, ψ2h = view(vars.ψh, :, :, 1), view(vars.ψh, :, :, 2)
-			
-		APE = 1 / (2 * V) * params.f₀^2 / params.g′ * parsevalsum(abs2.(ψ1h .- ψ2h), grid)
-			  
-		return APE
+function LinStrat(f₀, H₀, Ld)
+	N₀ = pi * f₀ * Ld / H₀
+
+	return N₀
 end
 
-function calc_meridiff(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
 
-	psi1, psi2 = view(vars.ψ, :, :, 1), view(vars.ψ, :, :, 2)
-	v1, v2 = view(vars.v, :, :, 1), view(vars.v, :, :, 2)
+### Diagnostics ###
 
-	psi_bc = 0.5 .* (psi1 - psi2)
-	v_bt = 0.5 .* (v1 + v2)
+# Note:
+# Most of these diagnostics assume constant stratification; they must be modified when using nonconstant stratification
+# They also assume equal layer depths for simplicity
 
-	U1 = view(params.U, 1, 1, 1)
-    U2 = view(params.U, 1, 1, 2)
-    U0 = 0.5 * (U1 - U2)
+function BarotropicEKE(prob)
+    vars, params = prob.vars, prob.params
 
-	D = mean(psi_bc .* v_bt ./ U0)
-		  
-	return D
+	nz = params.nlayers					# number of layers
+	ϕ₀ = reshape(ones(nz), 1, 1, :)		# barotropic mode (nx, ny, nz)
+
+	u = view(vars.u, :, :, :)			# zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)			# meridional velocity (nx, ny, nz)
+
+    u₀ = mean(u .* ϕ₀, dims = 3)	# barotropic zonal velocity (nx, ny, 1)
+	v₀ = mean(v .* ϕ₀, dims = 3)	# barotropic meridional velocity (nx, ny, 1)
+
+	E₀ = mean(0.5 .* (u₀.^2 .+ v₀.^2))	# domain integrated barotropic EKE (scalar)
+
+    return E₀
 end
 
-function calc_meribarovel(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function FirstBaroclinicEKE(prob)
+    vars, params = prob.vars, prob.params
 
-	v1, v2 = view(vars.v, :, :, 1), view(vars.v, :, :, 2)
-	v_bt = 0.5 .* (v1 + v2)
+	nz = params.nlayers				# number of layers
+	H = collect(params.H)           # array of layer heights (nz)
+	H₀ = sum(H)						# total depth [m]
+	z = range(0., -H₀, nz + 1)      # vertical cell edges
+	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 
-	V = sqrt(mean(v_bt.^2))
-		  
-	return V
+	ϕ₁ = reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :)	# first baroclinic mode (nx, ny, nz)
+
+	u = view(vars.u, :, :, :)			# zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)			# meridional velocity (nx, ny, nz)
+
+    u₁ = mean(u .* ϕ₁, dims = 3)		# first baroclinic zonal velocity (nx, ny, 1)
+	v₁ = mean(v .* ϕ₁, dims = 3)		# first baroclinic meridional velocity (nx, ny, 1))
+
+	E₁ = mean(0.5 .* (u₁.^2 .+ v₁.^2))	# domain integrated first baroclinic EKE (scalar)
+
+    return E₁
 end
 
-function calc_mixlen(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function FullEKE(prob)
+	vars, params = prob.vars, prob.params
+	B = device_array(CPU())
 
-	psi1, psi2 = view(vars.ψ, :, :, 1), view(vars.ψ, :, :, 2)
-	psi_bc = 0.5 .* (psi1 - psi2)
+	u = view(vars.u, :, :, :)			# zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)			# meridional velocity (nx, ny, nz)
 
-	U1 = view(params.U, 1, 1, 1)
-    U2 = view(params.U, 1, 1, 2)
-    U0 = 0.5 * (U1 - U2)
+	E = dropdims(mean(0.5 .* (u.^2 + v.^2), dims = (1, 2)), dims = (1, 2))	# full EKE profile (nz)
 
-	Lmix = sqrt(mean(psi_bc.^2) ./ U0.^2) 
-	  
-	return Lmix
+	return B(E)
 end
 
-function calc_KEFlux_1(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function FirstBaroclinicDiffusivity(prob)
+	vars, params = prob.vars, prob.params
 
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
+	nz = params.nlayers				# number of layers
+	H = collect(params.H)           # array of layer heights (nz)
+	H₀ = sum(H)						# total depth [m]
+	z = range(0., -H₀, nz + 1)      # vertical cell edges
+	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
+	ϕ₀ = reshape(ones(nz), 1, 1, :)							# barotropic mode (nx, ny, nz)
+	ϕ₁ = reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :)	# first baroclinic mode (nx, ny, nz)
 
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
+	v = view(vars.v, :, :, :)		# meridional velocity (nx, ny, nz)
+	ψ = view(vars.ψ, :, :, :)		# stream function (nx, ny, nz)
 
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	KEFlux1 = zeros(K_id)
+	v₀ = mean(v .* ϕ₀, dims = 3)	# barotropic meridional velocity (nx, ny, 1)
+	ψ₁ = mean(ψ .* ϕ₁, dims = 3)	# first baroclinic streamfunction (nx, ny, 1)
+	U₁ = mean(params.U .* ϕ₁)		 	# first baroclinic mean shear (scalar)
 
-	for j = 1:K_id
-        # Get stream functions and vorticity
-	    psih = vars.ψh
-	    zetah = -grid.Krsq .* vars.ψh
+	D₁ = mean(v₀ .* ψ₁ ./ U₁)			# domain integrated first baroclinic eddy diffusivity (scalar)
 
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-
-		# Inverse transform the filtered fields
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-
-		# Calculate spectral derivatives of zeta
-		zetah_ik = im .* grid.kr .* zetah
-		zetah_il = im .* grid.l .* zetah
-
-		# Calculate real derivatives of zeta
-		zeta_dx = A(zeros(nx, nx, nlayers))
-		invtransform!(zeta_dx, zetah_ik, params)
-
-		zeta_dy = A(zeros(nx, nx, nlayers))
-		invtransform!(zeta_dy, zetah_il, params)
-
-		# Create views of only upper layer fields
-		psi_hpf_1 = view(psi_hpf, :, :, 1)
-		u_1 = view(vars.u, :, :, 1)
-		v_1 = view(vars.v, :, :, 1)
-		zeta_dx_1 = view(zeta_dx, :, :, 1)
-		zeta_dy_1 = view(zeta_dy, :, :, 1)
-
-		view(KEFlux1, j) .= mean(psi_hpf_1 .* u_1 .* zeta_dx_1 + psi_hpf_1 .* v_1 .* zeta_dy_1)
-	end
-	return KEFlux1
+	return D₁
 end
 
-function calc_APEFlux_1(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function PVDiffusivity(prob)
+	vars, params = prob.vars, prob.params
+	B = device_array(CPU())
 
-	Ld = grid.Lx / (2 * pi * 25)
+	v = view(vars.v, :, :, :)		# meridional velocity
+	q = view(vars.q, :, :, :)		# PV
 
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
+	Gamma = collect(params.S[1, 1])										# stretching matrix (nz, nz)
+	U = dropdims(mean(params.U, dims = (1, 2)), dims = (1, 2))			# background zonal velocity (nz)
+	Qy = reshape(Gamma * U, 1, 1, :)									# background meridional PV gradient from shear (nz)
 
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
+	D = dropdims(mean((v .* q) ./ Qy, dims = (1, 2)), dims = (1, 2))	# PV diffusivity profile (nz)
 
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
-
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	APEFlux1 = zeros(K_id)
-
-    for j = 1:K_id
-        # Get stream function
-        psih = vars.ψh
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-        
-        # Inverse transform the filtered fields
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-        
-        # Create views of single layer fields
-        psi_hpf_1 = view(psi_hpf, :, :, 1)
-        u1 = view(vars.u, :, :, 1)
-        u2 = view(vars.u, :, :, 2)
-        v1 = view(vars.v, :, :, 1)
-        v2 = view(vars.v, :, :, 2)
-
-		view(APEFlux1, j) .= mean(0.5 / Ld^2 .* psi_hpf_1 .* u1 .* v2 - 0.5 / Ld^2 .* psi_hpf_1 .* u2 .* v1)
-	end
-	return APEFlux1
+	return B(D)
 end
 
-function calc_ShearFlux_1(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function FirstBaroclinicMixingLength(prob)
+	vars, params = prob.vars, prob.params
 
-	Ld = grid.Lx / (2 * pi * 25)
-	U1 = view(params.U, 1, 1, 1)
-    U2 = view(params.U, 1, 1, 2)
-    U0 = 0.5 * (U1 - U2)
+	nz = params.nlayers				# number of layers
+	H = collect(params.H)           # array of layer heights (nz)
+	H₀ = sum(H)						# total depth [m]
+	z = range(0., -H₀, nz + 1)      # vertical cell edges
+	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
+	ϕ₁ = reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :)	# first baroclinic mode (nx, ny, nz)
 
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
+	ψ = view(vars.ψ, :, :, :)			# stream function (nx, ny, nz)
+	ψ₁ = mean(ψ .* ϕ₁, dims = 3)		# first baroclinic streamfunction (nx, ny, 1)
+	U₁ = mean(params.U .* ϕ₁)			# first baroclinic mean shear (scalar)
 
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
+	l₁ = sqrt(mean(ψ₁.^2 ./ U₁^2))		# domain integrated first baroclinic eddy mixing length (scalar)
 
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-
-	ShearFlux1 = zeros(K_id)
-
-	for j = 1:K_id
-        # Get stream function
-	    psih = vars.ψh
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-
-		# Calculate spectral derivative
-		psih_ik = im .* grid.kr .* psih
-
-		# Inverse transforms
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-
-		psi_dx = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_dx, psih_ik, params)
-
-		# Views of necessary upper and lower layer fields
-		psi_hpf_1 = view(psi_hpf, :, :, 1)
-		psi_dx_2 = view(psi_dx, :, :, 2)
-
-		# Calculate flux
-		view(ShearFlux1, j) .= mean(U0 ./ Ld^2 .* psi_hpf_1 .* psi_dx_2)
-	end
-	return ShearFlux1
+	return l₁
 end
 
-function calc_KEFlux_2(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
+function PVMixingLength(prob)
+	vars, params = prob.vars, prob.params
+	B = device_array(CPU())
 
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
+	q = view(vars.q, :, :, :)
 
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
+	Gamma = collect(params.S[1, 1])												# stretching matrix (nz, nz)
+	U = dropdims(mean(params.U, dims = (1, 2)), dims = (1, 2))					# background zonal velocity (nz)
+	Qy = reshape(Gamma * U, 1, 1, :)											# background meridional PV gradient from shear (nz)
 
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
+	l = sqrt.(dropdims(mean((q.^2) ./ (Qy.^2), dims = (1, 2)), dims = (1, 2)))	# PV mixing length profile (nz)
 
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	KEFlux2 = zeros(K_id)
-
-	for j = 1:K_id
-        # Get stream functions and vorticity
-	    psih = vars.ψh
-	    zetah = -grid.Krsq .* vars.ψh
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-
-		# Inverse transform the filtered fields
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-
-		# Calculate spectral derivatives of zeta
-		zetah_ik = im .* grid.kr .* zetah
-		zetah_il = im .* grid.l .* zetah
-
-		# Calculate real derivatives of zeta
-		zeta_dx = A(zeros(nx, nx, nlayers))
-		invtransform!(zeta_dx, zetah_ik, params)
-
-		zeta_dy = A(zeros(nx, nx, nlayers))
-		invtransform!(zeta_dy, zetah_il, params)
-
-		# Create views of only lower layer fields
-		psi_hpf_2 = view(psi_hpf, :, :, 2)
-		u_2 = view(vars.u, :, :, 2)
-		v_2 = view(vars.v, :, :, 2)
-		zeta_dx_2 = view(zeta_dx, :, :, 2)
-		zeta_dy_2 = view(zeta_dy, :, :, 2)
-
-		view(KEFlux2, j) .= mean(psi_hpf_2 .* u_2 .* zeta_dx_2 + psi_hpf_2 .* v_2 .* zeta_dy_2)
-	end
-	return KEFlux2
-end
-
-function calc_APEFlux_2(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
-
-	Ld = grid.Lx / (2 * pi * 25)
-
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
-
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
-
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
-
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	APEFlux2 = zeros(K_id)
-
-    for j = 1:K_id
-        # Get stream function
-        psih = vars.ψh
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-        
-        # Inverse transform the filtered fields
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-        
-        # Create views of single layer fields
-        psi_hpf_2 = view(psi_hpf, :, :, 2)
-        u1 = view(vars.u, :, :, 1)
-        u2 = view(vars.u, :, :, 2)
-        v1 = view(vars.v, :, :, 1)
-        v2 = view(vars.v, :, :, 2)
-
-		view(APEFlux2, j) .= mean(-0.5 / Ld^2 .* psi_hpf_2 .* u1 .* v2 + 0.5 / Ld^2 .* psi_hpf_2 .* u2 .* v1)
-	end
-	return APEFlux2
-end
-
-function calc_TopoFlux_2(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
-
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
-
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
-
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
-
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	TopoFlux2 = zeros(K_id)
-
-	for j = 1:K_id
-        # Get stream function, velocity and topography
-	    psih = vars.ψh
-	    eta = A(params.eta)
-        u = vars.u
-        v = vars.v
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		psih_hpf = hpf .* psih
-
-		# Inverse transform the filtered fields
-		psi_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(psi_hpf, psih_hpf, params)
-
-		# Calculate forward transforms of products 
-		uetah = A(zeros(nk, nl, nlayers)) .* im
-		fwdtransform!(uetah, u .* eta, params)
-
-        vetah = A(zeros(nk, nl, nlayers)) .* im
-		fwdtransform!(vetah, v .* eta, params)
-
-        # Calculate spectral derivatives of products
-		uetah_ik = im .* grid.kr .* uetah
-		vetah_il = im .* grid.l .* vetah
-		
-		# Calculate real derivatives of products
-		ueta_dx = A(zeros(nx, nx, nlayers))
-		invtransform!(ueta_dx, etah_ik, params)
-
-		veta_dy = A(zeros(nx, nx, nlayers))
-		invtransform!(veta_dy, vetah_il, params)
-
-		# Create views of only lower layer fields
-		psi_hpf_2 = view(psi_hpf, :, :, 2)
-		ueta_dx_2 = view(ueta_dx, :, :, 2)
-		veta_dy_2 = view(veta_dy, :, :, 2)
-
-		view(TopoFlux2, j) .= mean(psi_hpf_2 .* ueta_dx_2 + psi_hpf_2 .* veta_dy_2)
-	end
-	return TopoFlux2
-end
-
-function calc_DragFlux_2(prob)
-	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
-
-	### Create isotropic wavenumber grid ###
-	nk = Int(nx / 2 + 1)
-	nl = nx
-
-	kr = prob.grid.kr
-	l = prob.grid.l
-	Kr = @. sqrt(kr^2 + l^2)
-
-	krmax = maximum(kr)
-	lmax = maximum(abs.(l))
-	Kmax = sqrt(krmax^2 + lmax^2)
-	Kmin = 0.
-
-	dkr = 2 * pi / Lx
-	dl = dkr
-	dKr = sqrt(dkr^2 + dl^2)
- 
-	K = Kmin:dKr:Kmax-dKr
-	K_id = lastindex(K)
-	
-	DragFlux2 = zeros(K_id)
-
-	for j = 1:K_id
-        # Get velocities
-	    uh = vars.uh
-	    vh = vars.vh
-
-		# Define high-pass filter matrix
-		hpf = ifelse.(Kr .> K[j], Kr ./ Kr, 0 .* Kr)
-
-		# Filter the Fourier transformed fields
-		uh_hpf = hpf .* uh
-		vh_hpf = hpf .* vh
-
-		# Inverse transform the filtered fields
-		u_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(u_hpf, uh_hpf, params)
-
-		v_hpf = A(zeros(nx, nx, nlayers))
-		invtransform!(v_hpf, vh_hpf, params)
-
-		# Create views of only lower layer fields
-		u_hpf_2 = view(u_hpf, :, :, 2)
-		v_hpf_2 = view(v_hpf, :, :, 2)
-
-		# Calculate drag flux
-		view(DragFlux2, j) .= mean(-2 * μ .* u_hpf.^2 - 2 * μ .* v_hpf.^2)
-	end
-	return DragFlux2
+	return B(l)
 end
 
 end
