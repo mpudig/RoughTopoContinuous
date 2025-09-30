@@ -57,8 +57,8 @@ r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
 
 		### Background profiles ###
 
-ϕ₁ = sqrt(2) * cos(N₀ / (Ld * f₀) * zc)      # first baroclinic vertical mode
-U = U₀ * ϕ₁ - U₀ * ϕ₁[end] 					 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
+ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * zc)     # first baroclinic vertical mode
+U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 				 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
 b = N₀^2 .* zc             				     # background buoyancy profile given constant N₀ [m s-2]
 
       	### Topography ###
