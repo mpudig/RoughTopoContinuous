@@ -35,26 +35,31 @@ g = Params.g
 b = Params.b
 U = Params.U
 
-#eta = Params.eta
+eta = Params.eta
 
       ### Time stepping ###
 
 dt = Params.dt
-nsubs = Params.nsubs
-nsteps = Params.nsteps
-dtsnap = Params.dtsnap
 tmax = Params.tmax
+dtsnap_diags = Params.dtsnap_diags
+dtsnap_q = Params.dtsnap_q
+nsubs_diags = Params.nsubs_diags
+nsubs_q = Params.nsubs_q
+nsteps = Params.nsteps
 stepper = Params.stepper
 
       ### Step the model forward ###
 
-function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
-      saveproblem(out)
-      saveoutput(out)
-      sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
+function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, diags, EKE)
+      # Save initial conditions
+      saveproblem(out_q)
+      saveproblem(out_diags)
+      saveoutput(out_q)
+      saveoutput(out_diags)
 
+      sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
       startwalltime = time()
-      frames = 0:round(Int, nsteps / nsubs)
+      frames = 0:round(Int, nsteps / nsubs_diags)
 
       for j = frames
       cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
@@ -62,7 +67,7 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
             if j % 5 == 0
 
                   log = @sprintf("step: %04d, t: %.1f, cfl: %.3f, KE1: %.3e, KEN: %.3e, walltime: %.2f min",
-                  clock.step, clock.t, cfl, EKE.data[EKE.i][1][1], EKE.data[EKE.i][1][end], (time()-startwalltime)/60)
+                  clock.step, clock.t, cfl, EKE.data[EKE.i][1], EKE.data[EKE.i][end], (time() - startwalltime) / 60)
 
                   println(log)
                   flush(stdout)
@@ -74,8 +79,9 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
                   # Reset time stepping variables
                   dt = clock.dt / 2
                   clock.dt = dt
-                  nsubs = Int(dtsnap / dt)
-                  nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs
+                  nsubs_diags = Int(dtsnap_diags / dt) 
+                  nsubs_q = Int(dtsnap_q / dt)
+                  nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_q) * nsubs_q
 
                   # Reset diagnostics for new nsteps
                   # Energies
@@ -91,7 +97,8 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
                   l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
                   l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
 
-                  diags = [E₀,
+                  diags = [
+                        E₀,
                         E₁,
                         EKE,
                         D₁,
@@ -101,9 +108,18 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
                         ]
             end
 
-            stepforward!(prob, diags, nsubs)
+            # Step forward until next diagnostic save
+            stepforward!(prob, diags, nsubs_diags)
             MultiLayerQG.updatevars!(prob)
-            saveoutput(out)
+            
+            # Save at diagnostic frequency
+            saveoutput(out_diags)
+
+            # Save at q frequency
+            if j % Int(dtsnap_q / dtsnap_diags) == 0
+
+                  saveoutput(out_q)
+            end
       end
 end
 
@@ -126,7 +142,7 @@ end
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, b, μ, dt, stepper, aliased_fraction = 0)
+      prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, b, eta, μ, dt, stepper, aliased_fraction = 0)
 
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
       x, y = grid.x, grid.y
@@ -145,21 +161,27 @@ function start!()
       l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
       l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
 
-      diags = [E₀,
-               E₁,
-               EKE,
-               D₁,
-               D,
-               l₁,
-               l
-               ]
+      diags = [
+            E₀,
+            E₁,
+            EKE,
+            D₁,
+            D,
+            l₁,
+            l
+            ]
 
-      filename = Params.path_name
-      if isfile(filename); rm(filename); end
+      filename_q = Params.path_name[1:end-5] * "_q" * ".jld2"
+      if isfile(filename_q); rm(filename_q); end
+
+      filename_diags = Params.path_name[1:end-5] * "_diags" * ".jld2"
+      if isfile(filename_diags); rm(filename_diags); end
+
+      # Output q
+      out_q = Output(prob, filename_q, (:q, get_q))
 
       # Output diagnostics
-      out = Output(prob, filename,
-                  (:q, get_q),
+      out_diags = Output(prob, filename_diags,
                   (:EKE, Utils.FullEKE),
                   (:E₀, Utils.BarotropicEKE),
                   (:E₁, Utils.FirstBaroclinicEKE),
@@ -169,7 +191,7 @@ function start!()
                   (:l, Utils.PVMixingLength)
                   )
 
-      Utils.set_initial_condition!(prob, Params.E0, Params.K0, Params.Kd, Params.ϕ₁)
+      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
-      simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out, diags, EKE)
+      simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, diags, EKE)
 end

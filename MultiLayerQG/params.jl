@@ -15,7 +15,7 @@ import .Utils
 
 # format: nz = ..., kappa = ..., h = ...
 expt_name = "/nz4_r02_h0"
-path_name = "/scratch/mp6191/RoughTopoContinous" * expt_name * "/output" * expt_name * ".jld2"
+path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
 
@@ -63,18 +63,25 @@ b = N₀^2 .* zc             				     # background buoyancy profile given consta
 
       	### Topography ###
 
-#hrms = h_star * U₀ * H₀ * Ktopo / f₀                        # rms topographic height [m]
-#h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Lx, nx, dev)   # random Goff Jordan topography [m]
-#eta = f₀ / H[end] .* h                                      # bottom layer topographic PV [s-1]
+Ktopo = Kd															# minimum topographic wavenumber [m-1]
+hrms = h_star * U₀ * H₀ * Ktopo / f₀								# rms topographic height [m]
+h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
+eta = f₀ / H[end] .* h                                      		# bottom layer topographic PV [s-1]
 
       	### Time stepping ###
 
-Ti = Ld / U0                							    # nondimensional time
+Ti = Ld / U₀                							    # nondimensional time
 tmax = 400 * Ti          						            # final time [s]
-dt = 60 * 12.                                               # time step [s]]
-dtsnap = 60 * 60 * 24 * 100    							    # snapshot frequency [s]
-nsubs = Int(dtsnap / dt)     							    # number of time steps between snapshots
-nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs    # total number of model steps, nsubs should divide nsteps
+dt = 60 * 60 * 12.                                          # time step [s]
+
+dtsnap_diags = 60 * 60 * 24 * 30    						# snapshot frequency for diagnostics [s]
+dtsnap_q = 10 * dtsnap_diags								# snapshot frequency for q [s]
+
+nsubs_diags = Int(dtsnap_diags / dt)     					# number of time steps between snapshots for saving diagnostics
+nsubs_q = Int(dtsnap_q / dt)     							# number of time steps between snapshots for saving q
+
+nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_q) * nsubs_q    # total number of model steps, nsubs_q > nsubs_diags so this defines the total number of model time steps
+
 stepper = "FilteredRK4"   								    # timestepper
 
 
