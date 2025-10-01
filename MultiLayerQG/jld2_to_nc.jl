@@ -51,8 +51,10 @@ function convert_to_nc_fields()
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
 
-    ds = NCDataset("../../output" * expt_name * "_fields.nc", "c")
-    ds = NCDataset("../../output" * expt_name * "_fields.nc", "a")
+    nc_path = "../../output" * expt_name * "_fields.nc"
+    rm(nc_path)
+    ds = NCDataset(nc_path, "c")
+    ds = NCDataset(nc_path, "a")
 
     # Define attributes
 
@@ -171,8 +173,10 @@ function convert_to_nc_diags()
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
 
-    ds = NCDataset("../../output" * expt_name * "_diags.nc", "c")
-    ds = NCDataset("../../output" * expt_name * "_diags.nc", "a")
+    nc_path = "../../output" * expt_name * "_diags.nc"
+    rm(nc_path)
+    ds = NCDataset(nc_path, "c")
+    ds = NCDataset(nc_path, "a")
 
     # Define attributes
 

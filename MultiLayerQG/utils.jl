@@ -294,7 +294,7 @@ function PVDiffusivity(prob)
 	etay = irfft(im * grid.l .* rfft(params.eta), grid.nx)	# background PV gradient from topography (nx, ny)
 	@views @. Qy[:, :, params.nlayers] -= etay + β			# background PV gradient from thermal wind shear (nz)
 
-	D = dropdims(mean((v .* q) ./ Qy, dims = (1, 2)), dims = (1, 2))	# PV diffusivity profile (nz)
+	D = dropdims(mean((v .* q) ./ (-1 .* Qy), dims = (1, 2)), dims = (1, 2))	# PV diffusivity profile (nz)
 
 	return B(D)
 end
