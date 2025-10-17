@@ -289,10 +289,10 @@ function PVDiffusivity(prob)
 	v = view(vars.v, :, :, :)			# meridional velocity
 	q = view(vars.q, :, :, :)			# PV
 	
-	Qy = view(params.Qy, :, :, :)							# background meridional PV gradient (nx, ny, nz)
-	β = params.β											# background PV gradient from β (scalar)
-	etay = irfft(im * grid.l .* rfft(params.eta), grid.nx)	# background PV gradient from topography (nx, ny)
-	@views @. Qy[:, :, params.nlayers] -= etay + β			# background PV gradient from thermal wind shear (nz)
+	Qy = view(params.Qy, :, :, :)							    # background meridional PV gradient (nx, ny, nz)
+	β = params.β											    # background PV gradient from β (scalar)
+	etay = irfft(im * grid.l .* rfft(A(params.eta)), grid.nx)	# background PV gradient from topography (nx, ny)
+	@views @. Qy[:, :, params.nlayers] -= etay + β			    # background PV gradient from thermal wind shear (nz)
 
 	D = dropdims(mean((v .* q) ./ (-1 .* Qy), dims = (1, 2)), dims = (1, 2))	# PV diffusivity profile (nz)
 
@@ -328,10 +328,10 @@ function PVMixingLength(prob)
 
 	q = view(vars.q, :, :, :)
 
-	Qy = view(params.Qy, :, :, :)							# background meridional PV gradient (nx, ny, nz)
-	β = params.β											# background PV gradient from β (scalar)
-	etay = irfft(im * grid.l .* rfft(params.eta), grid.nx)	# background PV gradient from topography (nx, ny)
-	@views @. Qy[:, :, params.nlayers] -= etay + β			# background PV gradient from thermal wind shear (nz)
+	Qy = view(params.Qy, :, :, :)							    # background meridional PV gradient (nx, ny, nz)
+	β = params.β											    # background PV gradient from β (scalar)
+	etay = irfft(im * grid.l .* rfft(A(params.eta)), grid.nx)	# background PV gradient from topography (nx, ny)
+	@views @. Qy[:, :, params.nlayers] -= etay + β			    # background PV gradient from thermal wind shear (nz)
 
 	l = sqrt.(dropdims(mean((q.^2) ./ (Qy.^2), dims = (1, 2)), dims = (1, 2)))	# PV mixing length profile (nz)
 

@@ -66,8 +66,8 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, di
 
             if j % 5 == 0
 
-                  log = @sprintf("step: %04d, t: %.1f, cfl: %.3f, KE1: %.3e, KEN: %.3e, walltime: %.2f min",
-                  clock.step, clock.t, cfl, EKE.data[EKE.i][1], EKE.data[EKE.i][end], (time() - startwalltime) / 60)
+                  log = @sprintf("step: %04d, t: %.1f, cfl: %.3f, KE1: %.3e, KE%d: %.3e, walltime: %.2f min",
+                  clock.step, clock.t, cfl, EKE.data[EKE.i][1], nlayers, EKE.data[EKE.i][end], (time() - startwalltime) / 60)
 
                   println(log)
                   flush(stdout)
