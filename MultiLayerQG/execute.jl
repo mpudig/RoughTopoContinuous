@@ -42,15 +42,15 @@ eta = Params.eta
 dt = Params.dt
 tmax = Params.tmax
 dtsnap_diags = Params.dtsnap_diags
-dtsnap_q = Params.dtsnap_q
+dtsnap_fields = Params.dtsnap_fields
 nsubs_diags = Params.nsubs_diags
-nsubs_q = Params.nsubs_q
+nsubs_fields = Params.nsubs_fields
 nsteps = Params.nsteps
 stepper = Params.stepper
 
       ### Step the model forward ###
 
-function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, diags, EKE)
+function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
       # Save initial conditions
       saveproblem(out_q)
       saveproblem(out_diags)
@@ -80,8 +80,8 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, di
                   dt = clock.dt / 2
                   clock.dt = dt
                   nsubs_diags = Int(dtsnap_diags / dt) 
-                  nsubs_q = Int(dtsnap_q / dt)
-                  nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_q) * nsubs_q
+                  nsubs_fields = Int(dtsnap_fields / dt)
+                  nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields
 
                   # Reset diagnostics for new nsteps
                   # Energies
@@ -115,10 +115,10 @@ function simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, di
             # Save at diagnostic frequency
             saveoutput(out_diags)
 
-            # Save at q frequency
-            if j % Int(dtsnap_q / dtsnap_diags) == 0
+            # Save at 3D field frequency
+            if j % Int(dtsnap_fields / dtsnap_diags) == 0
 
-                  saveoutput(out_q)
+                  saveoutput(out_fields)
             end
       end
 end
@@ -171,14 +171,14 @@ function start!()
             l
             ]
 
-      filename_q = Params.path_name[1:end-5] * "_q" * ".jld2"
-      if isfile(filename_q); rm(filename_q); end
+      filename_fields = Params.path_name[1:end-5] * "_fields" * ".jld2"
+      if isfile(filename_fields); rm(filename_fields); end
 
       filename_diags = Params.path_name[1:end-5] * "_diags" * ".jld2"
       if isfile(filename_diags); rm(filename_diags); end
 
-      # Output q
-      out_q = Output(prob, filename_q, (:q, get_q))
+      # Output 3D fields
+      out_fields = Output(prob, filename_fields, (:q, get_q))
 
       # Output diagnostics
       out_diags = Output(prob, filename_diags,
@@ -193,5 +193,5 @@ function start!()
 
       Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
-      simulate!(nsteps, nsubs, dtsnap, tmax, grid, prob, out_q, out_diags, diags, EKE)
+      simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
 end

@@ -75,12 +75,12 @@ tmax = 400 * Ti          						            # final time [s]
 dt = 60 * 60 * 12.                                          # time step [s]
 
 dtsnap_diags = 60 * 60 * 24 * 30    						# snapshot frequency for diagnostics [s]
-dtsnap_q = 10 * dtsnap_diags								# snapshot frequency for q [s]
+dtsnap_fields = 10 * dtsnap_diags							# snapshot frequency for fields [s]
 
 nsubs_diags = Int(dtsnap_diags / dt)     					# number of time steps between snapshots for saving diagnostics
-nsubs_q = Int(dtsnap_q / dt)     							# number of time steps between snapshots for saving q
+nsubs_fields = Int(dtsnap_fields / dt)     					# number of time steps between snapshots for saving fields
 
-nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_q) * nsubs_q    # total number of model steps, nsubs_q > nsubs_diags so this defines the total number of model time steps
+nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields    # total number of model steps, nsubs_fields > nsubs_diags so this defines the total number of model time steps
 
 stepper = "FilteredRK4"   								    # timestepper
 
