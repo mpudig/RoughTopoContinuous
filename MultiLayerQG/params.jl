@@ -14,7 +14,7 @@ import .Utils
 		### Save path and device ###
 
 # format: nz = ..., kappa = ..., h = ...
-expt_name = "/nz4_r02_h0"
+expt_name = "/test"
 path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
