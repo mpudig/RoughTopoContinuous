@@ -52,9 +52,9 @@ stepper = Params.stepper
 
 function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
       # Save initial conditions
-      saveproblem(out_q)
+      saveproblem(out_fields)
       saveproblem(out_diags)
-      saveoutput(out_q)
+      saveoutput(out_fields)
       saveoutput(out_diags)
 
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
