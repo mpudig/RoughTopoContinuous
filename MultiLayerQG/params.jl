@@ -64,7 +64,6 @@ b = N₀^2 .* zc             				     # background buoyancy profile given consta
       	### Topography ###
 
 Ktopo = Kd															# minimum topographic wavenumber [m-1]
-hrms = h_star * U₀ * H₀ * Ktopo / f₀								# rms topographic height [m]
 h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
 eta = f₀ / H[end] .* h                                      		# bottom layer topographic PV [s-1]
 
