@@ -6,7 +6,7 @@ module Params
 include("utils.jl")
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
+using GeophysicalFlows, FFTW, Statistics, Random, LinearAlgebra, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
 
 # local import
 import .Utils
