@@ -57,7 +57,7 @@ r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
 
 		### Background profiles ###
 b = N₀^2 .* zc             				    # background buoyancy profile given constant N₀ [m s-2]
-F = calcF(f₀, b, H, nz)						# stretching matrix 
+F = Utils.calcF(f₀, b, H, nz)						# stretching matrix 
 ϕ₁ = eigvecs(-F)[:,2]						# first baroclinic vertical mode
 U = abs.(U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]))        # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
 

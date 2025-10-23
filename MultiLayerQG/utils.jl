@@ -3,7 +3,7 @@
 module Utils
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
+using GeophysicalFlows, FFTW, Statistics, Random, LinearAlgebra, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
 using FourierFlows: parsevalsum
 
 """
