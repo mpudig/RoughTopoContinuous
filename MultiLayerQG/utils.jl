@@ -171,15 +171,34 @@ function set_initial_condition!(prob, K0, E0, ϕ₁)
 end
 
 """
-        LinStrat(f₀, H, Ld)
+        LinStrat(f₀, H, Ld, nz)
 
-Returns linear stratification for given first baroclinic deformation radius
+Returns linear stratification for given first baroclinic deformation radius;
+this formula comes from the eigenvalues of the stretching operator given linear
+stratification and equal layer depths.
 """
 
-function LinStrat(f₀, H₀, Ld)
-	N₀ = pi * f₀ * Ld / H₀
+function LinStrat(f₀, H₀, Ld, nz)
+	N₀ = 2 * f₀ * Ld / H₀ * nz * sin(pi / (2 * nz))
 
 	return N₀
+end
+
+"""
+        StetchingMatrix(f₀, H, b, nz)
+
+Computes the discrete stretching operator
+"""
+
+function calcF(f₀, b, H, nz)
+       b = reshape(b, (1,  1, nz))
+       H = Tuple(H)
+       g′ = b[1 : nz - 1] - b[2 : nz]
+       Fm = @. f₀^2 / (g′ * H[2 : nz])
+       Fp = @. f₀^2 / (g′ * H[1 : nz - 1])
+       F = Matrix(Tridiagonal(Fm, -([Fp; 0] + [0; Fm]), Fp))
+	   
+       return F
 end
 
 

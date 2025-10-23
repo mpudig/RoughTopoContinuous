@@ -50,16 +50,16 @@ U₀ = 1e-2              			    # baroclinic shear [m s-1]
 f₀ = 1e-4                           # constant Coriolis [s-1]
 β = U₀ * β_star / Ld^2			    # y gradient of Coriolis [m-1 s-1]
 g = 9.81                            # gravity [m2 s-1]
-N₀ = Utils.LinStrat(f₀, H₀, Ld)	    # buoyancy frequency magnitude for given deformation radius, etc [s-1]
+N₀ = Utils.LinStrat(f₀, H₀, Ld, nz)	# buoyancy frequency magnitude for given deformation radius, etc [s-1]
 r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
 μ = f₀ / H[end] * r 			    # bottom layer drag [s-1]
 
 
 		### Background profiles ###
-
-ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * zc)     # first baroclinic vertical mode
-U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 				 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
-b = N₀^2 .* zc             				     # background buoyancy profile given constant N₀ [m s-2]
+b = N₀^2 .* zc             				    # background buoyancy profile given constant N₀ [m s-2]
+F = calcF(f₀, b, H, nz)						# stretching matrix 
+ϕ₁ = eigvecs(-F)[:,2]						# first baroclinic vertical mode
+U = abs.(U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]))        # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
 
       	### Topography ###
 
