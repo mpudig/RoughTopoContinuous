@@ -51,7 +51,7 @@ stepper = Params.stepper
       ### Step the model forward ###
 
 function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
-      # Save initial conditions
+      # Save problem and initial conditions
       saveproblem(out_fields)
       saveproblem(out_diags)
       saveoutput(out_fields)

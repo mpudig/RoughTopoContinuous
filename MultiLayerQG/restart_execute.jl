@@ -54,7 +54,9 @@ stepper = Params.stepper
       ### Step the model forward ###
 
 function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
-      # No need to save initial conditions
+      # Save problem
+      saveproblem(out_fields)
+      saveproblem(out_diags)
 
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
       startwalltime = time()
