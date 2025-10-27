@@ -143,9 +143,10 @@ end
 
 function start!()
       prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, b, eta, μ, dt, stepper, aliased_fraction = 0)
-
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
-      x, y = grid.x, grid.y
+
+      ### Set initial condition ###
+      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
       ### Define diagnostics ###
       # Energies
@@ -190,8 +191,6 @@ function start!()
                   (:l₁, Utils.FirstBaroclinicMixingLength),
                   (:l, Utils.PVMixingLength)
                   )
-
-      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
       simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
 end

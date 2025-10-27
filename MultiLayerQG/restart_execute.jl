@@ -1,4 +1,6 @@
 # This is the driver: set up, run, and save the model
+# This module assumes a .nc file exists to restart from
+# and outputs new files given the name of files already in the folder
 
 # include all modules
 include("utils.jl")
@@ -7,6 +9,7 @@ include("params.jl")
 # compile other packages
 using GeophysicalFlows, FFTW, Statistics, Random, Printf, JLD2, NCDatasets, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, GPUArrays, KernelAbstractions;
 using FourierFlows: CPU, GPU
+using Dates
 
 # local import
 import .Utils
@@ -51,11 +54,7 @@ stepper = Params.stepper
       ### Step the model forward ###
 
 function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
-      # Save initial conditions
-      saveproblem(out_fields)
-      saveproblem(out_diags)
-      saveoutput(out_fields)
-      saveoutput(out_diags)
+      # No need to save initial conditions
 
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
       startwalltime = time()
@@ -143,9 +142,25 @@ end
 
 function start!()
       prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, b, eta, μ, dt, stepper, aliased_fraction = 0)
-
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
-      x, y = grid.x, grid.y
+
+      ### Set initial condition from restart ###
+      # Find most recent .nc file and use as restart
+
+      folder = "../../output"
+      ext = "_fields.nc"
+      files = filter(f -> endswith(f, ext), readdir(folder, join = true))
+      restart_path = isempty(files) ? nothing :
+      argmax(files) do f
+            stat(f).mtime  # modification time
+      end
+
+      # Set initial condition as last output in restart file
+      A = device_array(grid.device)
+      file = NCDataset(restart_path, "r")
+      qi = file["q"][:, :, :, end]
+      MultiLayerQG.set_q!(prob, A(qi))
+      close(file)
 
       ### Define diagnostics ###
       # Energies
@@ -190,8 +205,6 @@ function start!()
                   (:l₁, Utils.FirstBaroclinicMixingLength),
                   (:l, Utils.PVMixingLength)
                   )
-
-      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
       simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
 end

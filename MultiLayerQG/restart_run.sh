@@ -14,4 +14,4 @@
 module purge
 
 # Activate singularity and run script
-juliaGPU driver.jl
+juliaGPU restart_driver.jl

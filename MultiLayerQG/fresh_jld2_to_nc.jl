@@ -10,7 +10,7 @@ function convert_to_nc_fields()
     # Get path and open jld2 file
 
     expt_name = Params.expt_name
-    file_path = "../../output" * expt_name * "_fields" * ".jld2"
+    file_path = Params.path_name[1:end-5] * "_fields" * ".jld2"
     file = jldopen(file_path)
 
     # Get necessary key information from file
@@ -51,7 +51,7 @@ function convert_to_nc_fields()
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
 
-    nc_path = "../../output" * expt_name * "_fields.nc"
+    nc_path = file_path[1:end-5] * ".nc"
     if isfile(nc_path); rm(nc_path); end
     ds = NCDataset(nc_path, "c")
     ds = NCDataset(nc_path, "a")
@@ -118,7 +118,7 @@ function convert_to_nc_diags()
     # Get path and open jld2 file
 
     expt_name = Params.expt_name
-    file_path = "../../output" * expt_name * "_diags" * ".jld2"
+    file_path = Params.path_name[1:end-5] * "_diags" * ".jld2"
     file = jldopen(file_path)
 
     # Get necessary key information from file

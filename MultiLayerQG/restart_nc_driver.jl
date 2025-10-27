@@ -1,9 +1,3 @@
-include("utils.jl")
-include("params.jl")
-include("restart_execute.jl")
-
-start!()
-
 # Convert jld2 file to nc file
 include("restart_jld2_to_nc.jl")
 convert_to_nc_fields()
