@@ -173,7 +173,7 @@ function convert_to_nc_diags()
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
 
-    nc_path = "../../output" * expt_name * "_diags.nc"
+    nc_path = file_path[1:end-5] * ".nc"
     if isfile(nc_path); rm(nc_path); end
     ds = NCDataset(nc_path, "c")
     ds = NCDataset(nc_path, "a")

@@ -162,6 +162,7 @@ function start!()
       file = NCDataset(restart_path, "r")
       qi = file["q"][:, :, :, end]
       MultiLayerQG.set_q!(prob, A(qi))
+      clock.t = file["t"][end]
       close(file)
 
       ### Define diagnostics ###
