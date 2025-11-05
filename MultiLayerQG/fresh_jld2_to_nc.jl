@@ -166,9 +166,9 @@ function convert_to_nc_diags()
     l = reduce(hcat, l)
     
     E0 = [file["snapshots/E₀/$iteration"] for iteration in iterations]
-    E1 = [file["snapshots/E₁/$iteration"] for iteration in iterations]
-    D1 = [file["snapshots/D₁/$iteration"] for iteration in iterations]
-    l1 = [file["snapshots/l₁/$iteration"] for iteration in iterations]
+    #E1 = [file["snapshots/E₁/$iteration"] for iteration in iterations]
+    #D1 = [file["snapshots/D₁/$iteration"] for iteration in iterations]
+    #l1 = [file["snapshots/l₁/$iteration"] for iteration in iterations]
 
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
@@ -227,20 +227,20 @@ function convert_to_nc_diags()
     defVar(ds, "E0", Float64, ("t",))
     ds["E0"][:] = E0
 
-    defVar(ds, "E1", Float64, ("t",))
-    ds["E1"][:] = E1
+    #defVar(ds, "E1", Float64, ("t",))
+    #ds["E1"][:] = E1
 
     defVar(ds, "D", Float64, ("lev", "t"))
     ds["D"][:, :] = D
 
-    defVar(ds, "D1", Float64, ("t",))
-    ds["D1"][:] = D1
+    #defVar(ds, "D1", Float64, ("t",))
+    #ds["D1"][:] = D1
 
     defVar(ds, "l", Float64, ("lev", "t"))
     ds["l"][:, :] = l
 
-    defVar(ds, "l1", Float64, ("t",))
-    ds["l1"][:] = l1
+    #defVar(ds, "l1", Float64, ("t",))
+    #ds["l1"][:] = l1
 
     # Finally, after all the work is done, we can close the file and the dataset
     close(file)

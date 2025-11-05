@@ -86,24 +86,24 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                   # Reset diagnostics for new nsteps
                   # Energies
                   E₀ = Diagnostic(Utils.BarotropicEKE, prob; nsteps)
-                  E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
+                  #E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
                   EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
 
                   # Diffusivity
-                  D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
+                  #D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
                   D = Diagnostic(Utils.PVDiffusivity, prob; nsteps)
                         
                   # Mixing length
-                  l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
+                  #l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
                   l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
 
                   diags = [
                         E₀,
-                        E₁,
+                        #E₁,
                         EKE,
-                        D₁,
+                        #D₁,
                         D,
-                        l₁,
+                        #l₁,
                         l
                         ]
             end
@@ -151,24 +151,24 @@ function start!()
       ### Define diagnostics ###
       # Energies
       E₀ = Diagnostic(Utils.BarotropicEKE, prob; nsteps)
-      E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
+      #E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
       EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
 
       # Diffusivity
-      D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
+      #D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
       D = Diagnostic(Utils.PVDiffusivity, prob; nsteps)
       
       # Mixing length
-      l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
+      #l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
       l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
 
       diags = [
             E₀,
-            E₁,
+            #E₁,
             EKE,
-            D₁,
+            #D₁,
             D,
-            l₁,
+            #l₁,
             l
             ]
 
@@ -185,10 +185,10 @@ function start!()
       out_diags = Output(prob, filename_diags,
                   (:EKE, Utils.FullEKE),
                   (:E₀, Utils.BarotropicEKE),
-                  (:E₁, Utils.FirstBaroclinicEKE),
-                  (:D₁, Utils.FirstBaroclinicDiffusivity),
+                  #(:E₁, Utils.FirstBaroclinicEKE),
+                  #(:D₁, Utils.FirstBaroclinicDiffusivity),
                   (:D, Utils.PVDiffusivity),
-                  (:l₁, Utils.FirstBaroclinicMixingLength),
+                  #(:l₁, Utils.FirstBaroclinicMixingLength),
                   (:l, Utils.PVMixingLength)
                   )
 
