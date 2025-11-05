@@ -6,7 +6,7 @@ module Params
 include("utils.jl")
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
+using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff
 
 # local import
 import .Utils
@@ -15,7 +15,7 @@ import .Utils
 
 # format: nz = ..., kappa = ..., h = ...
 expt_name = "/nz4_r02_h0"
-path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
+path_name = "/scratch/mp6191/RoughTopoContinuous/ExpStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
 
@@ -26,9 +26,10 @@ nz = 4               # number of z grid points
 
     	### Control parameters ###
 
-r_star = 0.2		  # nondimensional drag coefficient, r* = rf₀λ/UH
-h_star = 0.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
-β_star = 0.			  # nondimensional beta, β* = βλ²/U
+r_star = 0.2		# nondimensional drag coefficient, r* = rf₀λ/UH
+h_star = 0.         # nondimensional advection-topography, h* = f₀h₀/UHKₜ
+β_star = 0.			# nondimensional beta, β* = βλ²/U
+δ = 0.25			# stratification scale height, N²(z) = N²₀ exp(z / δH₀)
 
 		### Domain ###
 
@@ -46,20 +47,20 @@ zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 
     	### Background scalar parameters ###
 
-U₀ = 1e-2              			    # baroclinic shear [m s-1]
-f₀ = 1e-4                           # constant Coriolis [s-1]
-β = U₀ * β_star / Ld^2			    # y gradient of Coriolis [m-1 s-1]
-g = 9.81                            # gravity [m2 s-1]
-N₀ = Utils.LinStrat(f₀, H₀, Ld)	    # buoyancy frequency magnitude for given deformation radius, etc [s-1]
-r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
-μ = f₀ / H[end] * r 			    # bottom layer drag [s-1]
+U₀ = 1e-2              			    		# baroclinic shear [m s-1]
+f₀ = 1e-4                           		# constant Coriolis [s-1]
+β = U₀ * β_star / Ld^2			    		# y gradient of Coriolis [m-1 s-1]
+a₁ = Utils.ExpStratEigval1(δ)				# first baroclinic eigenvalue for exponential stratifcation and given δ [unitless]
+N₀ = Utils.ExpStratN(f₀, H₀, Ld, δ, a₁)		# buoyancy frequency magnitude for given deformation radius, etc [s-1]
+r = H₀ * U₀ / (f₀ * Ld) * r_star    		# linear drag [m]
+μ = f₀ / H[end] * r 			    		# bottom layer drag [s-1]
 
 
 		### Background profiles ###
 
-ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * zc)     # first baroclinic vertical mode
-U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 				 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
-b = N₀^2 .* zc             				     # background buoyancy profile given constant N₀ [m s-2]
+ϕ₁ = Utils.ExpStratPhi1(zc, δ, H₀, a₁)     	# first baroclinic vertical mode
+U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 				# background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
+b = N₀^2 * δ * H₀ .* exp.(zc ./ (δ * H₀))   # background buoyancy profile for exponential stratification [m s-2]
 
       	### Topography ###
 

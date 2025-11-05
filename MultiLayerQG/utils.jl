@@ -3,7 +3,7 @@
 module Utils
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
+using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff
 using FourierFlows: parsevalsum
 
 """
@@ -176,12 +176,73 @@ end
 Returns linear stratification for given first baroclinic deformation radius
 """
 
-function LinStrat(f₀, H₀, Ld)
-	N₀ = pi * f₀ * Ld / H₀
+# function LinStrat(f₀, H₀, Ld)
+# 	N₀ = pi * f₀ * Ld / H₀
+
+# 	return N₀
+# end
+
+"""
+		ExpStratEigval1(δ)
+Returns the first baroclinic eigenvalue for exponential stratification and given δ.
+Uses a Newton method to compute it numerically (I know roughly where it'll be, hence the hard-coded first guess!)
+"""
+
+function ExpStratEigval1(δ)
+
+	f(x) = besselj(0, x) * bessely(0, exp(-1/(2*δ)) * x) - bessely(0, x) * besselj(0, exp(-1/(2*δ)) * x)	# Equation needed to solve for eigenvalue (e.g., see LaCasce 2012)
+	autodiff(f) = x -> ForwardDiff.derivative(f, x)		# Derivative of f (easier to do this numerically)
+
+	function Newton(f, x0, tol = 1e-12, maxIter = 1e3)
+		x = x0
+		fx = f(x0)
+		fp = autodiff(f)
+		iter = 0
+		while abs(fx) > tol && iter < maxIter
+               x = x  - fx/fp(x)   # Iteration
+               fx = f(x)           # Precompute f(x)
+               iter += 1
+           end
+           return x
+	end
+
+	x0 = 2.					# Hard-coded initial guess
+	a₁ = Newton(f, x0)		# Eigenvalue
+
+	return a₁
+end
+
+"""
+		ExpStratN(f₀, H₀, Ld, δ, a₁)
+Returns the N₀ needed for a given deformation radius and δ with exponential stratification
+"""
+
+function ExpStratN(f₀, H₀, Ld, δ, a₁)
+		N₀ = f₀ * a₁ * Ld / (2 * H₀ * δ)
 
 	return N₀
 end
 
+"""
+		ExpStratPhi1(zc, δ, H₀, a₁)
+Returns the first baroclinic eigenfunction for given exponential stratification evaluated at zc and normalized in a depth-averaged sense.
+"""
+
+function ExpStratPhi1(zc, δ, H₀, a₁)
+	#ϕ₁ = exp.(zc ./ (2 * δ * H₀)) .* (bessely(0, a₁) .* besselj.(1, a₁ .* exp.(zc ./ (2 * δ * H₀))) .- besselj(0, a₁) .* bessely.(1, a₁ .* exp.(zc ./ (2 * δ * H₀))))
+	ϕ₁(z) = exp.(z ./ (2 * δ * H₀)) .* (bessely(0, a₁) .* besselj.(1, a₁ .* exp.(z ./ (2 * δ * H₀))) .- besselj(0, a₁) .* bessely.(1, a₁ .* exp.(z ./ (2 * δ * H₀))))
+
+	# Compute normalization constant on a much finer grid, where zc is the center
+	nz_fine = 1000
+	H_fine = H₀ / nz_fine .* ones(nz_fine)
+	z_fine = range(0., -H₀, nz_fine + 1)
+	zc_fine = z_fine[1 : end - 1] .- H_fine ./ 2
+
+	ϕ₁_fine = ϕ₁(zc_fine)
+	A = sqrt(1 / mean(ϕ₁_fine .^ 2))
+
+	return A .* ϕ₁(zc)
+end
 
 ### Diagnostics ###
 
