@@ -1,4 +1,4 @@
-### Parameters for multi-layer QG turbulence simulations with small-scale topography and linear stratification ###
+### Parameters for multi-layer QG turbulence simulations with small-scale topography and exponential stratification ###
 
 module Params
 
@@ -14,7 +14,7 @@ import .Utils
 		### Save path and device ###
 
 # format: nz = ..., kappa = ..., h = ...
-expt_name = "/nz4_r02_h0"
+expt_name = "/nz4_r02_h0_delta025"
 path_name = "/scratch/mp6191/RoughTopoContinuous/ExpStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()

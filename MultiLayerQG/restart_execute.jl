@@ -32,7 +32,6 @@ H = Params.H
 
 f₀ = Params.f₀
 β = Params.β
-g = Params.g
 μ = Params.μ
 
 b = Params.b
