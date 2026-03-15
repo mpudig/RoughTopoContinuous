@@ -14,20 +14,20 @@ import .Utils
 		### Save path and device ###
 
 # format: nz = ..., kappa = ..., h = ...
-expt_name = "/nz4_r02_h0"
+expt_name = "/nz32_r02_h5_torch"
 path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
 
 		### Resolution ###
 
-nx = 512             # number of x, y grid points
+nx = 256             # number of x, y grid points
 nz = 4               # number of z grid points
 
     	### Control parameters ###
 
 r_star = 0.2		  # nondimensional drag coefficient, r* = rf₀λ/UH
-h_star = 0.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
+h_star = 1.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
 β_star = 0.			  # nondimensional beta, β* = βλ²/U
 
 		### Domain ###
@@ -70,14 +70,14 @@ eta = f₀ / H[end] .* h                                      		# bottom layer t
       	### Time stepping ###
 
 Ti = Ld / U₀                							    # nondimensional time
-tmax = 400 * Ti          						            # final time [s]
-dt = 60 * 60 * 12.                                          # time step [s]
+tmax = 25 * Ti          						            # final time [s]
+dt = 60 * 60 * 12                                          # time step [s]
 
-dtsnap_diags = 60 * 60 * 24 * 30    						# snapshot frequency for diagnostics [s]
-dtsnap_fields = 10 * dtsnap_diags							# snapshot frequency for fields [s]
+dtsnap_diags = Ti / 5    						# snapshot frequency for diagnostics [s]
+dtsnap_fields = dtsnap_diags							# snapshot frequency for fields [s]
 
-nsubs_diags = Int(dtsnap_diags / dt)     					# number of time steps between snapshots for saving diagnostics
-nsubs_fields = Int(dtsnap_fields / dt)     					# number of time steps between snapshots for saving fields
+nsubs_diags = Int(floor(dtsnap_diags / dt))     					# number of time steps between snapshots for saving diagnostics
+nsubs_fields = Int(floor(dtsnap_fields / dt))     					# number of time steps between snapshots for saving fields
 
 nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields    # total number of model steps, nsubs_fields > nsubs_diags so this defines the total number of model time steps
 
