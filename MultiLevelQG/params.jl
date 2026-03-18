@@ -1,4 +1,4 @@
-### Parameters for multi-layer QG turbulence simulations with small-scale topography and linear stratification ###
+### Parameters for multi-level QG turbulence simulations with small-scale topography and linear stratification ###
 
 module Params
 
@@ -14,19 +14,19 @@ import .Utils
 		### Save path and device ###
 
 # format: nz = ..., kappa = ..., h = ...
-expt_name = "/nz32_r02_h5_torch"
+expt_name = "/nz32_r02_h5"
 path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
 
 dev = GPU() # or CPU()
 
 		### Resolution ###
 
-nx = 256             # number of x, y grid points
-nz = 4               # number of z grid points
+nx = 512             # number of x, y grid points
+nz = 12              # number of z grid points
 
     	### Control parameters ###
 
-r_star = 0.2		  # nondimensional drag coefficient, r* = rf₀λ/UH
+r_star = 0.2		  # nondimensional drag coefficient, r* = f₀λr/UH
 h_star = 1.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
 β_star = 0.			  # nondimensional beta, β* = βλ²/U
 
@@ -49,29 +49,25 @@ zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
 U₀ = 1e-2              			    # baroclinic shear [m s-1]
 f₀ = 1e-4                           # constant Coriolis [s-1]
 β = U₀ * β_star / Ld^2			    # y gradient of Coriolis [m-1 s-1]
-g = 9.81                            # gravity [m2 s-1]
 N₀ = Utils.LinStrat(f₀, H₀, Ld)	    # buoyancy frequency magnitude for given deformation radius, etc [s-1]
-r = H₀ * U₀ / (f₀ * Ld) * r_star    # linear drag [m]
-μ = f₀ / H[end] * r 			    # bottom layer drag [s-1]
-
+r = U₀ * H₀ / (f₀ * Ld) * r_star    # linear drag [m]
 
 		### Background profiles ###
 
-ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * zc)     # first baroclinic vertical mode
-U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 				 # background zonal shear projected onto first baroclinic mode (with barotropic shift so no background flow in lowest layer)
-b = N₀^2 .* zc             				     # background buoyancy profile given constant N₀ [m s-2]
+ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * [0.; zc; -H₀]) # first baroclinic vertical mode at interior and surfaces
+U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 	                    # background zonal shear projected onto first baroclinic mode (with barotropic shift)
+N² = N₀^2 .* ones(nz + 1)             		        # background constant N₀^2 at half levels [s-2]
 
       	### Topography ###
 
 Ktopo = Kd															# minimum topographic wavenumber [m-1]
 h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
-eta = f₀ / H[end] .* h                                      		# bottom layer topographic PV [s-1]
 
       	### Time stepping ###
 
 Ti = Ld / U₀                							    # nondimensional time
-tmax = 25 * Ti          						            # final time [s]
-dt = 60 * 60 * 12                                          # time step [s]
+tmax = 400 * Ti          						            # final time [s]
+dt = 60 * 60 * 12                                           # time step [s]
 
 dtsnap_diags = Ti / 5    						# snapshot frequency for diagnostics [s]
 dtsnap_fields = dtsnap_diags							# snapshot frequency for fields [s]

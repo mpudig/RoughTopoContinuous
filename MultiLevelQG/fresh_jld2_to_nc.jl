@@ -36,12 +36,12 @@ function convert_to_nc_fields()
     beta = Params.β
     H = Params.H
     H0 = Params.H₀
-    mu = Params.μ
+    r = Params.r
     U0 = Params.U₀
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
-    b = Params.b
+    N2 = Params.N²
 
     # Time and diagnostics
 
@@ -62,7 +62,7 @@ function convert_to_nc_fields()
     ds.attrib["dt"] = dt
     ds.attrib["f0"] = f0
     ds.attrib["beta"] = beta
-    ds.attrib["mu"] = mu
+    ds.attrib["r"] = r
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
     ds.attrib["U0"] = U0
@@ -71,7 +71,7 @@ function convert_to_nc_fields()
 
     defDim(ds, "x", size(x)[1])
     defDim(ds, "y", size(y)[1])
-    defDim(ds, "lev", nz)
+    defDim(ds, "lev", nz + 2)
     defDim(ds, "t", size(t)[1])
 
     # Define coordinates (i.e., variables with the same name as dimensions)
@@ -83,7 +83,7 @@ function convert_to_nc_fields()
     ds["y"][:] = y
 
     defVar(ds, "lev", Int64, ("lev",))
-    ds["lev"][:] = 1:1:nz
+    ds["lev"][:] = 1:1:nz + 2
 
     defVar(ds, "t", Float64, ("t",))
     ds["t"][:] = t
@@ -93,8 +93,8 @@ function convert_to_nc_fields()
     defVar(ds, "htop", Float64, ("x", "y"))
     ds["htop"][:, :] = htop
 
-    defVar(ds, "b", Float64, ("lev",))
-    ds["b"][:] = b
+    defVar(ds, "N2", Float64, ("lev",))
+    ds["N2"][:] = N2
 
     defVar(ds, "U", Float64, ("lev",))
     ds["U"][:] = U
@@ -144,12 +144,12 @@ function convert_to_nc_diags()
     beta = Params.β
     H = Params.H
     H0 = Params.H₀
-    mu = Params.μ
+    r = Params.r
     U0 = Params.U₀
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
-    b = Params.b
+    N2 = Params.N²
 
     # Time and diagnostics
 
@@ -184,7 +184,7 @@ function convert_to_nc_diags()
     ds.attrib["dt"] = dt
     ds.attrib["f0"] = f0
     ds.attrib["beta"] = beta
-    ds.attrib["mu"] = mu
+    ds.attrib["r"] = r
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
     ds.attrib["U0"] = U0
@@ -193,7 +193,7 @@ function convert_to_nc_diags()
 
     defDim(ds, "x", size(x)[1])
     defDim(ds, "y", size(y)[1])
-    defDim(ds, "lev", nz)
+    defDim(ds, "lev", nz + 2)
     defDim(ds, "t", size(t)[1])
 
     # Define coordinates (i.e., variables with the same name as dimensions)
@@ -205,7 +205,7 @@ function convert_to_nc_diags()
     ds["y"][:] = y
 
     defVar(ds, "lev", Int64, ("lev",))
-    ds["lev"][:] = 1:1:nz
+    ds["lev"][:] = 1:1:nz+2
 
     defVar(ds, "t", Float64, ("t",))
     ds["t"][:] = t
@@ -215,8 +215,8 @@ function convert_to_nc_diags()
     defVar(ds, "htop", Float64, ("x", "y"))
     ds["htop"][:, :] = htop
 
-    defVar(ds, "b", Float64, ("lev",))
-    ds["b"][:] = b
+    defVar(ds, "N2", Float64, ("lev",))
+    ds["N2"][:] = N2
 
     defVar(ds, "U", Float64, ("lev",))
     ds["U"][:] = U
