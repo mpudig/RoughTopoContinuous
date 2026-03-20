@@ -77,8 +77,8 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                   # Reset time stepping variables
                   dt = clock.dt / 2
                   clock.dt = dt
-                  nsubs_diags = Int(dtsnap_diags / dt) 
-                  nsubs_fields = Int(dtsnap_fields / dt)
+                  nsubs_diags = Int(floor(dtsnap_diags / dt))
+                  nsubs_fields = Int(floor(dtsnap_fields / dt))
                   nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields
 
                   # Reset diagnostics for new nsteps
@@ -140,7 +140,7 @@ end
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = MultiLevelQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, N², eta, r, dt, stepper, aliased_fraction = 0)
+      prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, U, H, N², eta, r, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
       ### Set initial condition ###

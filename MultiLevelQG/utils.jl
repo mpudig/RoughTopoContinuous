@@ -242,6 +242,7 @@ function FullEKE(prob)
 	# so that variables are updated properly and I can print them as the model runs
 	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
 	B = device_array(CPU())
+    nz = params.nlevels				# number of interior levels
 
     @. vars.qh = sol
     MultiLevelQG.streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
@@ -253,9 +254,12 @@ function FullEKE(prob)
     MultiLevelQG.invtransform!(vars.v, vars.vh, params)
 
 	u = copy(vars.u)                        # zonal velocity (nx, ny, nz + 2)
-    v = copy(vars.v)                        # meridional velocity (nx, ny, nz + 2)
     selectdim(u, 3, 1) .= 0.5 .* (selectdim(vars.u, 3, 1) .+ selectdim(vars.u, 3, 2))                # averages using ghost point to give u_1/2
     selectdim(u, 3, nz + 2) .= 0.5 .* (selectdim(vars.u, 3, nz + 1) .+ selectdim(vars.u, 3, nz + 2)) # averages using ghost point to give u_N+1/2
+
+    v = copy(vars.v)                        # meridional velocity (nx, ny, nz + 2)
+    selectdim(v, 3, 1) .= 0.5 .* (selectdim(vars.v, 3, 1) .+ selectdim(vars.v, 3, 2))                # averages using ghost point to give u_1/2
+    selectdim(v, 3, nz + 2) .= 0.5 .* (selectdim(vars.v, 3, nz + 1) .+ selectdim(vars.v, 3, nz + 2)) # averages using ghost point to give u_N+1/2
 
 	E = dropdims(mean(0.5 .* (u.^2 + v.^2), dims = (1, 2)), dims = (1, 2))	# full EKE profile (nz + 2)
 
@@ -294,6 +298,7 @@ function PVDiffusivity(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
 	A = device_array(grid.device)
 	B = device_array(CPU())
+    nz = params.nlevels				# number of interior levels
 
 	v = view(vars.v, :, :, 2 : nz + 1)	# interior meridional velocity (nx, ny, nz)
 	q = view(vars.q, :, :, 2 : nz + 1)  # interior PV (nx, ny, nz)
@@ -338,6 +343,7 @@ function PVMixingLength(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
 	A = device_array(grid.device)
 	B = device_array(CPU())
+    nz = params.nlevels				# number of interior levels
 
 	q = view(vars.q, :, :, 2 : nz + 1)       # interior PV (nx, ny, nz)
 	
