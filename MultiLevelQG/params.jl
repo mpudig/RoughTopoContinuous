@@ -37,11 +37,9 @@ Kd = 1 / Ld         # first baroclinic deformation wavenumber [m-1]
 ld = 2 * pi * Ld    # first baroclinic deformation wavelength [m]
 Lx = 15 * ld        # side length of square domain [m]
 
-H₀ = 4000.                      # total mean depth [m]
-Hᵢ = H₀ / nz                    # equal height of each layer [m]
-H =  Hᵢ .* ones(nz)             # array of layer heights
-z = range(0., -H₀, nz + 1)      # vertical cell edges
-zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
+H₀ = 4000.                                                  # total mean depth [m]
+ξ = [cos((i - 1) * pi / (nz - 1)) for i in 1 : nz]          # Chebyshev grid on [-1, 1]
+z = H₀ / 2 .* (ξ .- 1)                                      # maps [-1, 1] -> [-H₀, 0]
 
 
     	### Background scalar parameters ###
@@ -54,10 +52,10 @@ r = U₀ * H₀ / (f₀ * Ld) * r_star    # linear drag [m]
 
 		### Background profiles ###
 
-ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * [0.; zc; -H₀]) # first baroclinic vertical mode at interior and surfaces
-U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 	                    # background zonal shear projected onto first baroclinic mode (with barotropic shift)
-N² = N₀^2 .* ones(nz + 1)             		        # background constant N₀^2 at half levels [s-2]
-
+ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * z)    # first baroclinic vertical mode at Chebyshev levels
+U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 	           # background zonal shear projected onto first baroclinic mode (with barotropic shift such that U(-H) = 0) [m s-1]
+N² = N₀^2 .* ones(nz)                 	   # background constant N₀^2 at Chebyshev levels [s-2]
+   
       	### Topography ###
 
 Ktopo = Kd															# minimum topographic wavenumber [m-1]

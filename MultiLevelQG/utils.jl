@@ -129,32 +129,33 @@ function set_initial_condition!(prob, K0, E0, ϕ₁)
     psihmag = exp.(-(K .- K0).^2 ./ (2 * sigma^2)) .* exp.(2 * pi * im .* rand(nk, nl))
 
     # Give initial condition first baroclinic interior structure and zero surface buoyancy
-    psih = zeros(nk, nl, nz + 2) .* im
-    for j = 1 : nz
-        psih[:, :, j + 1] = psihmag .* ϕ₁[j]
+    psih = zeros(nk, nl, nz) .* im
+    for j = 2 : nz - 1
+        psih[:, :, j] = psihmag .* ϕ₁[j]
     end
-    CUDA.@allowscalar psih[:, :, 1] = psih[:, :, 2]          # \partial_z \phi|z=0 ~ \phi_0 - \phi_1 
-    CUDA.@allowscalar psih[:, :, end] = psih[:, :, end - 1]  # \partial_z \phi|z=-H ~ \phi_N - \phi_N+1 
+    CUDA.@allowscalar psih[:, :, 1] .= psih[:, :, 2]           # b|z=0 = 0 to first order (set exactly to zero later)
+    CUDA.@allowscalar psih[:, :, end] .= psih[:, :, end - 1]   # b|z=-H = 0 to first order (set exactly to zero later)
 
     # Calculate KE and APE, and prescribe mean total energy
     # For simplicity, neglect the z = 0 and z = -H surfaces in the calculation
-    H = params.H
-    V = grid.Lx * grid.Ly * sum(H)
+    z = params.z
+    V = grid.Lx * grid.Ly * abs(z[end])
     f0, N² = params.f₀, params.N²
 
     abs²∇𝐮h = zeros(nk, nl, nz) .* im
     for j = 1 : nz
-        abs²∇𝐮h[:, :, j] = K2 .* abs2.(psih[:, :, j + 1])
+        abs²∇𝐮h[:, :, j] = K2 .* abs2.(psih[:, :, j])
     end
 
     KE, PE = zeros(nz), zeros(nz - 1)
 
-    for j = 1 : nz
-        KE[j] = 1 / (2 * V) * parsevalsum(view(abs²∇𝐮h, :, :, j), grid) * params.H[j]
+    dz = -diff(collect(z))  
+    for j = 2 : nz - 1
+        KE[j] = 1 / (2 * V) * parsevalsum(view(abs²∇𝐮h, :, :, j), grid) * dz[j - 1]
     end
 
 	for j = 1 : nz - 1
-        PE[j] = 1 / (2 * V) * params.f₀^2 ./ params.N²[j + 1] .* parsevalsum(abs2.(view(psih, :, :, j + 1) .- view(psih, :, :, j + 2)), grid)
+        PE[j] = 1 / (2 * V) * params.f₀^2 ./ params.N²[j] .* parsevalsum(abs2.(view(psih, :, :, j) .- view(psih, :, :, j + 1)), grid)
     end
 
     E = sum(KE) + sum(PE)
@@ -163,11 +164,13 @@ function set_initial_condition!(prob, K0, E0, ϕ₁)
     psih = A(psih)
 
     # Invert psih to get qh, then transform qh to real space qh
-    qh = A(zeros(nk, nl, nz + 2)) .* im
+    qh = A(zeros(nk, nl, nz)) .* im
     MultiLevelQG.pvfromstreamfunction!(qh, psih, params, grid)
 
-    q = A(zeros(nx, nx, nz + 2))
+    q = A(zeros(nx, nx, nz))
     MultiLevelQG.invtransform!(q, qh, params)
+    CUDA.@allowscalar q[:, :, 1] .= 0           # b|z=0 = 0 exactly
+    CUDA.@allowscalar q[:, :, end] .= 0         # b|z=-H = 0 exactly
 
     # Set as initial condition
     MultiLevelQG.set_q!(prob, q)
@@ -197,13 +200,11 @@ function BarotropicEKE(prob)
 	A = device_array(grid.device)
 	B = device_array(CPU())
 
-	nz = params.nlevels					    # number of interior levels
-	ϕ₀ = A(reshape(ones(nz + 2), 1, 1, :))	# barotropic mode (nx, ny, nz + 2)
+	nz = params.nlevels					    # number of levels
+	ϕ₀ = A(reshape(ones(nz), 1, 1, :))	    # barotropic mode (nx, ny, nz)
 
-    u = copy(vars.u)                        # zonal velocity (nx, ny, nz + 2)
-    v = copy(vars.v)                        # meridional velocity (nx, ny, nz + 2)
-    selectdim(u, 3, 1) .= 0.5 .* (selectdim(vars.u, 3, 1) .+ selectdim(vars.u, 3, 2))                # averages using ghost point to give u_1/2
-    selectdim(u, 3, nz + 2) .= 0.5 .* (selectdim(vars.u, 3, nz + 1) .+ selectdim(vars.u, 3, nz + 2)) # averages using ghost point to give u_N+1/2
+    u = view(vars.u, :, :, :)               # zonal velocity (nx, ny, nz)
+    v = view(vars.v, :, :, :)               # meridional velocity (nx, ny, nz)
 
     u₀ = mean(u .* ϕ₀, dims = 3)	        # barotropic zonal velocity (nx, ny, 1)
 	v₀ = mean(v .* ϕ₀, dims = 3)	        # barotropic meridional velocity (nx, ny, 1)
@@ -218,19 +219,17 @@ function FirstBaroclinicEKE(prob)
 	A = device_array(grid.device)
 	B = device_array(CPU())
 
-	nz = params.nlevels				# number of interior levels
-	H = collect(params.H)           # array of layer heights (nz)
-	H₀ = sum(H)						# total depth [m]
-	z = range(0., -H₀, nz + 1)      # vertical cell edges
-	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
+	nz = params.nlevels				# number of levels
+	z = collect(params.z)           # vertical grid
+	H₀ = abs(z[end])				# total depth [m]
 
-	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
+	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* z ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
 
-	u = view(vars.u, :, :, 2 : nz + 1)	# interior zonal velocity (nx, ny, nz)
-	v = view(vars.v, :, :, 2 : nz + 1)	# interior meridional velocity (nx, ny, nz)
+	u = view(vars.u, :, :, :)	   # zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)	   # meridional velocity (nx, ny, nz)
 
-    u₁ = mean(u .* ϕ₁, dims = 3)		# first baroclinic zonal velocity (nx, ny, 1)
-	v₁ = mean(v .* ϕ₁, dims = 3)		# first baroclinic meridional velocity (nx, ny, 1))
+    u₁ = mean(u .* ϕ₁, dims = 3)   # first baroclinic zonal velocity (nx, ny, 1)
+	v₁ = mean(v .* ϕ₁, dims = 3)   # first baroclinic meridional velocity (nx, ny, 1))
 
 	E₁ = mean(0.5 .* (u₁.^2 .+ v₁.^2))	# domain integrated first baroclinic EKE (scalar)
 
@@ -242,7 +241,7 @@ function FullEKE(prob)
 	# so that variables are updated properly and I can print them as the model runs
 	vars, params, grid, sol = prob.vars, prob.params, prob.grid, prob.sol
 	B = device_array(CPU())
-    nz = params.nlevels				# number of interior levels
+    nz = params.nlevels			   # number of levels
 
     @. vars.qh = sol
     MultiLevelQG.streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
@@ -253,15 +252,10 @@ function FullEKE(prob)
     MultiLevelQG.invtransform!(vars.u, vars.uh, params)
     MultiLevelQG.invtransform!(vars.v, vars.vh, params)
 
-	u = copy(vars.u)                        # zonal velocity (nx, ny, nz + 2)
-    selectdim(u, 3, 1) .= 0.5 .* (selectdim(vars.u, 3, 1) .+ selectdim(vars.u, 3, 2))                # averages using ghost point to give u_1/2
-    selectdim(u, 3, nz + 2) .= 0.5 .* (selectdim(vars.u, 3, nz + 1) .+ selectdim(vars.u, 3, nz + 2)) # averages using ghost point to give u_N+1/2
+	u = view(vars.u, :, :, :)	   # zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)	   # meridional velocity (nx, ny, nz)
 
-    v = copy(vars.v)                        # meridional velocity (nx, ny, nz + 2)
-    selectdim(v, 3, 1) .= 0.5 .* (selectdim(vars.v, 3, 1) .+ selectdim(vars.v, 3, 2))                # averages using ghost point to give u_1/2
-    selectdim(v, 3, nz + 2) .= 0.5 .* (selectdim(vars.v, 3, nz + 1) .+ selectdim(vars.v, 3, nz + 2)) # averages using ghost point to give u_N+1/2
-
-	E = dropdims(mean(0.5 .* (u.^2 + v.^2), dims = (1, 2)), dims = (1, 2))	# full EKE profile (nz + 2)
+	E = dropdims(mean(0.5 .* (u.^2 + v.^2), dims = (1, 2)), dims = (1, 2))	# full EKE profile (nz)
 
 	return B(E)
 end
@@ -271,23 +265,21 @@ function FirstBaroclinicDiffusivity(prob)
 	A = device_array(grid.device)
     B = device_array(CPU())
 
-	nz = params.nlevels				# number of interior levels
-	H = collect(params.H)           # array of layer heights (nz)
-	H₀ = sum(H)						# total depth [m]
-	z = range(0., -H₀, nz + 1)      # vertical cell edges
-	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
+	nz = params.nlevels				# number of levels
+	z = collect(params.z)           # vertical grid
+	H₀ = abs(z[end])				# total depth [m]
 
 	ϕ₀ = A(reshape(ones(nz), 1, 1, :))							# barotropic mode (nx, ny, nz)
-	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
+	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* z ./ H₀), 1, 1, :))	    # first baroclinic mode (nx, ny, nz)
 
-	v = view(vars.v, :, :, 2 : nz + 1)		# interior meridional velocity (nx, ny, nz)
-	ψ = view(vars.ψ, :, :, 2 : nz + 1)		# interior stream function (nx, ny, nz)
+	v = view(vars.v, :, :, :)		# meridional velocity (nx, ny, nz)
+	ψ = view(vars.ψ, :, :, :)		# stream function (nx, ny, nz)
 
 	v₀ = mean(v .* ϕ₀, dims = 3)	# barotropic meridional velocity (nx, ny, 1)
 	ψ₁ = mean(ψ .* ϕ₁, dims = 3)	# first baroclinic streamfunction (nx, ny, 1)
     
-    U = view(params.U, :, :, 2 : nz + 1)  # interior background velocity (nx, ny, nz)
-	U₁ = mean(A(U) .* ϕ₁)	              # first baroclinic mean shear (scalar)
+    U = view(params.U, :, :, :)     # background velocity (nx, ny, nz)
+	U₁ = mean(A(U) .* ϕ₁)	        # first baroclinic mean shear (scalar)
 
 	D₁ = mean(v₀ .* ψ₁ ./ U₁)		# domain integrated first baroclinic eddy diffusivity (scalar)
 
@@ -298,17 +290,17 @@ function PVDiffusivity(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
 	A = device_array(grid.device)
 	B = device_array(CPU())
-    nz = params.nlevels				# number of interior levels
+    nz = params.nlevels				# number of levels
 
-	v = view(vars.v, :, :, 2 : nz + 1)	# interior meridional velocity (nx, ny, nz)
-	q = view(vars.q, :, :, 2 : nz + 1)  # interior PV (nx, ny, nz)
+	v = view(vars.v, :, :, :)	    # meridional velocity (nx, ny, nz)
+	q = view(vars.q, :, :, :)       # PV (nx, ny, nz)
 	
-	Qy = view(params.Qy, :, :, 2 : nz + 1)   # background meridional interior PV gradient (nx, ny, nz)
-	β = params.β							 # background PV gradient from β (scalar)
+	Qy = view(params.Qy, :, :, :)   # background meridional PV gradient (nx, ny, nz)
+	β = params.β				    # background PV gradient from β (scalar)
 
 	Qy_U = similar(Qy)
     copyto!(Qy_U, Qy)
-    @views @. Qy_U[:, :, :] -= β	         # background PV gradient from thermal wind shear (nz)
+    @views @. Qy_U[:, :, 2 : nz - 1] -= β	         # background PV gradient from thermal wind shear (nz)
 
 	D = dropdims(mean((v .* q) ./ (-1 .* Qy), dims = (1, 2)), dims = (1, 2))	# PV diffusivity profile (nz)
 
@@ -320,21 +312,19 @@ function FirstBaroclinicMixingLength(prob)
 	A = device_array(grid.device)
 	B = device_array(CPU())
 
-	nz = params.nlevels				# number of interior levels
-	H = collect(params.H)           # array of layer heights (nz)
-	H₀ = sum(H)						# total depth [m]
-	z = range(0., -H₀, nz + 1)      # vertical cell edges
-	zc = z[1 : end - 1] .- H ./ 2   # vertical cell centres
+	nz = params.nlevels				# number of levels
+	z = collect(params.z)           # vertical grid
+	H₀ = abs(z[end])				# total depth [m]
 
-	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* zc ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
+	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* z ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
 
-	ψ = view(vars.ψ, :, :, 2 : nz + 1)    # interioer stream function (nx, ny, nz)
-	ψ₁ = mean(ψ .* ϕ₁, dims = 3)		  # first baroclinic streamfunction (nx, ny, 1)
+	ψ = view(vars.ψ, :, :, :)       # stream function (nx, ny, nz)
+	ψ₁ = mean(ψ .* ϕ₁, dims = 3)    # first baroclinic streamfunction (nx, ny, 1)
 
-	U = view(params.U, :, :, 2 : nz + 1)  # interior background velocity (nx, ny, nz)
-	U₁ = mean(A(U) .* ϕ₁)	              # first baroclinic mean shear (scalar)
+	U = view(params.U, :, :, :)     # background velocity (nx, ny, nz)
+	U₁ = mean(A(U) .* ϕ₁)	        # first baroclinic mean shear (scalar)
 
-	l₁ = sqrt(mean(ψ₁.^2 ./ U₁^2))		# domain integrated first baroclinic eddy mixing length (scalar)
+	l₁ = sqrt(mean(ψ₁.^2 ./ U₁^2))  # domain integrated first baroclinic eddy mixing length (scalar)
 
 	return l₁
 end
@@ -343,18 +333,18 @@ function PVMixingLength(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
 	A = device_array(grid.device)
 	B = device_array(CPU())
-    nz = params.nlevels				# number of interior levels
+    nz = params.nlevels				# number of levels
 
-	q = view(vars.q, :, :, 2 : nz + 1)       # interior PV (nx, ny, nz)
+	q = view(vars.q, :, :, :)       # surface buoyancy/PV (nx, ny, nz)
 	
-	Qy = view(params.Qy, :, :, 2 : nz + 1)   # background meridional interior PV gradient (nx, ny, nz)
-	β = params.β							 # background PV gradient from β (scalar)
+	Qy = view(params.Qy, :, :, :)   # background meridional PV gradient (nx, ny, nz)
+	β = params.β				    # background PV gradient from β (scalar)
 
 	Qy_U = similar(Qy)
     copyto!(Qy_U, Qy)
-    @views @. Qy_U[:, :, :] -= β	         # background PV gradient from thermal wind shear (nz)
+    @views @. Qy_U[:, :, 2 : nz - 1] -= β	         # background PV gradient from thermal wind shear (nz)
 
-	l = sqrt.(dropdims(mean((q.^2) ./ (Qy.^2), dims = (1, 2)), dims = (1, 2)))	# PV mixing length profile (nz)
+	l = sqrt.(dropdims(mean((q.^2) ./ (Qy.^2), dims = (1, 2)), dims = (1, 2)))	# mixing length profile (nz)
 
 	return B(l)
 end

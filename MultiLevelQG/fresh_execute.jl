@@ -21,14 +21,13 @@ dev = Params.dev
 
 nx = Params.nx
 nlevels = Params.nz
-
 Lx = Params.Lx
-H = Params.H
 
       ### Background parameters ###
 
 f₀ = Params.f₀
 β = Params.β
+H₀ = Params.H₀
 r = Params.r
 N² = Params.N²
 U = Params.U
@@ -140,7 +139,7 @@ end
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, U, H, N², eta, r, dt, stepper, aliased_fraction = 0)
+      prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, N², eta, r, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
       ### Set initial condition ###
