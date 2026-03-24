@@ -225,8 +225,8 @@ function FirstBaroclinicEKE(prob)
 
 	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* z ./ H₀), 1, 1, :))	# first baroclinic mode (nx, ny, nz)
 
-	u = view(vars.u, :, :, :)	   # zonal velocity (nx, ny, nz)
-	v = view(vars.v, :, :, :)	   # meridional velocity (nx, ny, nz)
+	u = view(vars.u, :, :, :)	   # interior zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)	   # interior meridional velocity (nx, ny, nz)
 
     u₁ = mean(u .* ϕ₁, dims = 3)   # first baroclinic zonal velocity (nx, ny, 1)
 	v₁ = mean(v .* ϕ₁, dims = 3)   # first baroclinic meridional velocity (nx, ny, 1))
@@ -252,8 +252,8 @@ function FullEKE(prob)
     MultiLevelQG.invtransform!(vars.u, vars.uh, params)
     MultiLevelQG.invtransform!(vars.v, vars.vh, params)
 
-	u = view(vars.u, :, :, :)	   # zonal velocity (nx, ny, nz)
-	v = view(vars.v, :, :, :)	   # meridional velocity (nx, ny, nz)
+	u = view(vars.u, :, :, :)	   # interior zonal velocity (nx, ny, nz)
+	v = view(vars.v, :, :, :)	   # interior meridional velocity (nx, ny, nz)
 
 	E = dropdims(mean(0.5 .* (u.^2 + v.^2), dims = (1, 2)), dims = (1, 2))	# full EKE profile (nz)
 
@@ -272,13 +272,13 @@ function FirstBaroclinicDiffusivity(prob)
 	ϕ₀ = A(reshape(ones(nz), 1, 1, :))							# barotropic mode (nx, ny, nz)
 	ϕ₁ = A(reshape(sqrt(2) * cos.(pi .* z ./ H₀), 1, 1, :))	    # first baroclinic mode (nx, ny, nz)
 
-	v = view(vars.v, :, :, :)		# meridional velocity (nx, ny, nz)
-	ψ = view(vars.ψ, :, :, :)		# stream function (nx, ny, nz)
+	v = view(vars.v, :, :, :)		# interior meridional velocity (nx, ny, nz)
+	ψ = view(vars.ψ, :, :, :)		# interior stream function (nx, ny, nz)
 
 	v₀ = mean(v .* ϕ₀, dims = 3)	# barotropic meridional velocity (nx, ny, 1)
 	ψ₁ = mean(ψ .* ϕ₁, dims = 3)	# first baroclinic streamfunction (nx, ny, 1)
     
-    U = view(params.U, :, :, :)     # background velocity (nx, ny, nz)
+    U = view(params.U, :, :, :)     # interior background velocity (nx, ny, nz)
 	U₁ = mean(A(U) .* ϕ₁)	        # first baroclinic mean shear (scalar)
 
 	D₁ = mean(v₀ .* ψ₁ ./ U₁)		# domain integrated first baroclinic eddy diffusivity (scalar)
@@ -292,10 +292,10 @@ function PVDiffusivity(prob)
 	B = device_array(CPU())
     nz = params.nlevels				# number of levels
 
-	v = view(vars.v, :, :, :)	    # meridional velocity (nx, ny, nz)
-	q = view(vars.q, :, :, :)       # PV (nx, ny, nz)
+	v = view(vars.v, :, :, :)	    # interior meridional velocity (nx, ny, nz)
+	q = view(vars.q, :, :, :)       # interior PV (nx, ny, nz)
 	
-	Qy = view(params.Qy, :, :, :)   # background meridional PV gradient (nx, ny, nz)
+	Qy = view(params.Qy, :, :, :)   # background meridional interior PV gradient (nx, ny, nz)
 	β = params.β				    # background PV gradient from β (scalar)
 
 	Qy_U = similar(Qy)
@@ -321,7 +321,7 @@ function FirstBaroclinicMixingLength(prob)
 	ψ = view(vars.ψ, :, :, :)       # stream function (nx, ny, nz)
 	ψ₁ = mean(ψ .* ϕ₁, dims = 3)    # first baroclinic streamfunction (nx, ny, 1)
 
-	U = view(params.U, :, :, :)     # background velocity (nx, ny, nz)
+	U = view(params.U, :, :, :)     # interior background velocity (nx, ny, nz)
 	U₁ = mean(A(U) .* ϕ₁)	        # first baroclinic mean shear (scalar)
 
 	l₁ = sqrt(mean(ψ₁.^2 ./ U₁^2))  # domain integrated first baroclinic eddy mixing length (scalar)
@@ -333,11 +333,11 @@ function PVMixingLength(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
 	A = device_array(grid.device)
 	B = device_array(CPU())
-    nz = params.nlevels				# number of levels
+    nz = params.nlevels				# number of interior levels
 
 	q = view(vars.q, :, :, :)       # surface buoyancy/PV (nx, ny, nz)
 	
-	Qy = view(params.Qy, :, :, :)   # background meridional PV gradient (nx, ny, nz)
+	Qy = view(params.Qy, :, :, :)   # background meridional interior PV gradient (nx, ny, nz)
 	β = params.β				    # background PV gradient from β (scalar)
 
 	Qy_U = similar(Qy)

@@ -23,22 +23,19 @@ dev = Params.dev
       ### Grid ###
 
 nx = Params.nx
-nlayers = Params.nz
-
+nlevels = Params.nz
 Lx = Params.Lx
-H = Params.H
 
       ### Background parameters ###
 
 f₀ = Params.f₀
 β = Params.β
-g = Params.g
-μ = Params.μ
-
-b = Params.b
+H₀ = Params.H₀
+r = Params.r
+N² = Params.N²
 U = Params.U
 
-eta = Params.eta
+eta = Params.h
 
       ### Time stepping ###
 
@@ -68,7 +65,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
             if j % 5 == 0
 
                   log = @sprintf("step: %04d, t: %.1f, cfl: %.3f, KE1: %.3e, KE%d: %.3e, walltime: %.2f min",
-                  clock.step, clock.t, cfl, EKE.data[EKE.i][1], nlayers, EKE.data[EKE.i][end], (time() - startwalltime) / 60)
+                  clock.step, clock.t, cfl, EKE.data[EKE.i][1], nlevels, EKE.data[EKE.i][end], (time() - startwalltime) / 60)
 
                   println(log)
                   flush(stdout)
@@ -111,7 +108,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
 
             # Step forward until next diagnostic save
             stepforward!(prob, diags, nsubs_diags)
-            MultiLayerQG.updatevars!(prob)
+            MultiLevelQG.updatevars!(prob)
             
             # Save at diagnostic frequency
             saveoutput(out_diags)
@@ -135,7 +132,7 @@ function get_q(prob)
 
       q = A(zeros(size(vars.q)))
       qh = prob.sol
-      MultiLayerQG.invtransform!(q, qh, params)
+      MultiLevelQG.invtransform!(q, qh, params)
 
       return B(q)
 end
@@ -143,7 +140,7 @@ end
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, β, U, H, b, eta, μ, dt, stepper, aliased_fraction = 0)
+      prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, N², eta, r, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
       ### Set initial condition from restart ###
@@ -161,7 +158,7 @@ function start!()
       A = device_array(grid.device)
       file = NCDataset(restart_path, "r")
       qi = file["q"][:, :, :, end]
-      MultiLayerQG.set_q!(prob, A(qi))
+      MultiLevelQG.set_q!(prob, A(qi))
       clock.t = file["t"][end]
       close(file)
 

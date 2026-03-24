@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
-#SBATCH --mem=4GB
-#SBATCH --time=0:10:00
+#SBATCH --mem=8GB
+#SBATCH --time=0:30:00
 #SBATCH --mail-type=END
 #SBATCH --mail-user=mp6191@nyu.edu
 #SBATCH --output=slurm_%j.out
@@ -17,4 +17,3 @@ module purge
 
 # Activate singularity and run script
 juliaGPU fresh_driver.jl
-

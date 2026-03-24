@@ -13,4 +13,4 @@
 module purge
 
 # Activate singularity and run script
-julia fresh_nc_driver.jl
+julia nc_driver.jl

@@ -14,8 +14,13 @@ import .Utils
 		### Save path and device ###
 
 # format: nz = ..., kappa = ..., h = ...
-expt_name = "/nz32_r02_h5"
+expt_name = "/nz12_r02_h1"
+restart_num = 0
+if restart_num == 0
 path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * ".jld2"
+else
+path_name = "/scratch/mp6191/RoughTopoContinuous/LinStrat" * expt_name * "/output" * expt_name * "_restart$restart_num" * ".jld2"
+end
 
 dev = GPU() # or CPU()
 
@@ -68,7 +73,7 @@ tmax = 400 * Ti          						            # final time [s]
 dt = 60 * 60 * 12                                           # time step [s]
 
 dtsnap_diags = Ti / 5    						# snapshot frequency for diagnostics [s]
-dtsnap_fields = dtsnap_diags							# snapshot frequency for fields [s]
+dtsnap_fields = 5 * dtsnap_diags				# snapshot frequency for fields [s]
 
 nsubs_diags = Int(floor(dtsnap_diags / dt))     					# number of time steps between snapshots for saving diagnostics
 nsubs_fields = Int(floor(dtsnap_fields / dt))     					# number of time steps between snapshots for saving fields
@@ -81,6 +86,6 @@ stepper = "FilteredRK4"   								    # timestepper
 			### Initial condition ###
 
 K0 = 1 / (4 * Ld)          # most unstable Eady wavenumber, Km = 2 * pi / (4 * Ld) (see Vallis text)
-E0 = 1e-5                  # total average initial energy [m2 s-2]
+E0 = 1e-3                  # initial energy [m2 s-2]
 
 end
