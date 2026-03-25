@@ -2,7 +2,7 @@ using NCDatasets, JLD2
 
 # include and import parameters
 
-include("params.jl")
+include("../params.jl")
 import .Params
 
 # 3D fields

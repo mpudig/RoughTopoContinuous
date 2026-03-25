@@ -1,15 +1,12 @@
 # This is the driver: set up, run, and save the model
-# This module assumes a .nc file exists to restart from
-# and outputs new files given the name of files already in the folder
 
 # include all modules
-include("utils.jl")
+include("/Helpers/utils.jl")
 include("params.jl")
 
 # compile other packages
 using GeophysicalFlows, FFTW, Statistics, Random, Printf, JLD2, NCDatasets, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, GPUArrays, KernelAbstractions;
 using FourierFlows: CPU, GPU
-using Dates
 
 # local import
 import .Utils
@@ -48,12 +45,16 @@ nsubs_fields = Params.nsubs_fields
 nsteps = Params.nsteps
 stepper = Params.stepper
 
+restart_num = Params.restart_num
+
       ### Step the model forward ###
 
 function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
-      # Save problem
+      # Save problem and initial conditions
       saveproblem(out_fields)
       saveproblem(out_diags)
+      saveoutput(out_fields)
+      saveoutput(out_diags)
 
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
       startwalltime = time()
@@ -77,7 +78,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                   # Reset time stepping variables
                   dt = clock.dt / 2
                   clock.dt = dt
-                  nsubs_diags = Int(floor(dtsnap_diags / dt)) 
+                  nsubs_diags = Int(floor(dtsnap_diags / dt))
                   nsubs_fields = Int(floor(dtsnap_fields / dt))
                   nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields
 
@@ -143,16 +144,20 @@ function start!()
       prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, N², eta, r, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
-      ### Set initial condition from restart ###
-      # Find most recent .nc file and use as restart
+      ### Set initial condition ###
 
+      if restart_num == 0
+      # First baroclinic vertical structure with initial field at most unstable wavelength
+      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
+
+      else
+      # Find most recent .nc file and use as restart
       folder = "../../output"
       ext = "_fields.nc"
       files = filter(f -> endswith(f, ext), readdir(folder, join = true))
       restart_path = isempty(files) ? nothing :
       argmax(files) do f
-            stat(f).mtime  # modification time
-      end
+      stat(f).mtime  # modification time
 
       # Set initial condition as last output in restart file
       A = device_array(grid.device)
@@ -161,6 +166,7 @@ function start!()
       MultiLevelQG.set_q!(prob, A(qi))
       clock.t = file["t"][end]
       close(file)
+      end
 
       ### Define diagnostics ###
       # Energies
