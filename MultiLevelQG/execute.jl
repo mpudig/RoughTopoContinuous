@@ -1,7 +1,8 @@
 # This is the driver: set up, run, and save the model
 
 # include all modules
-include("/Helpers/utils.jl")
+dir = pwd()
+include(dir * "/Helpers/utils.jl")
 include("params.jl")
 
 # compile other packages
@@ -158,6 +159,7 @@ function start!()
       restart_path = isempty(files) ? nothing :
       argmax(files) do f
       stat(f).mtime  # modification time
+        end
 
       # Set initial condition as last output in restart file
       A = device_array(grid.device)

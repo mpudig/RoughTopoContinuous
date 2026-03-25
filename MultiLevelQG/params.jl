@@ -3,7 +3,8 @@
 module Params
 
 # include all modules
-include("/Helpers/utils.jl")
+dir = pwd()
+include(dir * "/Helpers/utils.jl")
 
 # compile other packages
 using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler

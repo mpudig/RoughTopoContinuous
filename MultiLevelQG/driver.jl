@@ -1,10 +1,11 @@
-include("utils.jl")
+dir = pwd()
+include(dir * "/Helpers/utils.jl")
 include("params.jl")
 include("execute.jl")
 
 start!()
 
 # Convert jld2 file to nc file
-include("jld2_to_nc.jl")
+include(dir * "/Helpers/jld2_to_nc.jl")
 convert_to_nc_fields()
 convert_to_nc_diags()
