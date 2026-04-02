@@ -1,6 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=<JOBNAME>
+#SBATCH --account=torch_pr_513_general
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16GB

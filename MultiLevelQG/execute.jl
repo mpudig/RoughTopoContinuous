@@ -148,8 +148,8 @@ function start!()
       ### Set initial condition ###
 
       if restart_num == 0
-      # First baroclinic vertical structure with initial field at most unstable wavelength
-      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
+      # Baroclinic vertical structure with initial field at most unstable wavelength
+      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕₘ)
 
       else
       # Find most recent .nc file and use as restart

@@ -14,7 +14,7 @@ import .Utils
 
 		### Save path and device ###
 
-# format: nz = ..., kappa = ..., h = ...
+# format: nz = ..., r = ..., h = ...
 expt_name = "/nz12_r02_h1"
 restart_num = 0
 if restart_num == 0
@@ -58,9 +58,10 @@ r = U₀ * H₀ / (f₀ * Ld) * r_star    # linear drag [m]
 
 		### Background profiles ###
 
-ϕ₁ = sqrt(2) * cos.(N₀ / (Ld * f₀) * z)    # first baroclinic vertical mode at Chebyshev levels
-U = U₀ .* ϕ₁ .- (U₀ * ϕ₁[end]) 	           # background zonal shear projected onto first baroclinic mode (with barotropic shift such that U(-H) = 0) [m s-1]
-N² = N₀^2 .* ones(nz)                 	   # background constant N₀^2 at Chebyshev levels [s-2]
+N² = N₀^2 .* ones(nz)                 	      # background constant N₀^2 at Chebyshev levels [s-2]
+m = 1                            	         # vertical mode number to project zonal flow onto
+ϕₘ = sqrt(2) * cos.(m * N₀ / (Ld * f₀) * z)  # baroclinic vertical mode at Chebyshev levels
+U = U₀ .* ϕₘ .- (U₀ * ϕₘ[end]) 	             # background zonal shear projected onto first baroclinic mode (with barotropic shift such that U(-H) = 0) [m s-1]
    
       	### Topography ###
 

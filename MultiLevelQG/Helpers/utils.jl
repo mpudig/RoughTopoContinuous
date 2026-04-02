@@ -92,12 +92,12 @@ function GoffJordanTopo(h_star, f0, U0, H0, Ktopo, Lx, nx, dev)
 end
 
 """
-        set_initial_condition!(prob, grid, K0, E0, ϕ₁)
+        set_initial_condition!(prob, grid, K0, E0, ϕₘ)
 
-        Sets the initial condition of MultiLayerQG to be a random q(x,y) field with baroclinic structure ϕ₁
+        Sets the initial condition of MultiLayerQG to be a random q(x,y) field with baroclinic structure ϕₘ
         and with energy localized in spectral space about K = K₀ and with total energy equal to E₀
 """
-function set_initial_condition!(prob, K0, E0, ϕ₁)
+function set_initial_condition!(prob, K0, E0, ϕₘ)
     params = prob.params
     grid = prob.grid
     vars = prob.vars
@@ -131,7 +131,7 @@ function set_initial_condition!(prob, K0, E0, ϕ₁)
     # Give initial condition first baroclinic interior structure and zero surface buoyancy
     psih = zeros(nk, nl, nz) .* im
     for j = 2 : nz - 1
-        psih[:, :, j] = psihmag .* ϕ₁[j]
+        psih[:, :, j] = psihmag .* ϕₘ[j]
     end
     CUDA.@allowscalar psih[:, :, 1] .= psih[:, :, 2]           # b|z=0 = 0 to first order (set exactly to zero later)
     CUDA.@allowscalar psih[:, :, end] .= psih[:, :, end - 1]   # b|z=-H = 0 to first order (set exactly to zero later)
