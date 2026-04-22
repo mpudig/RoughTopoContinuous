@@ -82,7 +82,7 @@ function convert_to_nc_fields()
     defVar(ds, "y", Float64, ("y",))
     ds["y"][:] = y
 
-    defVar(ds, "z", Int64, ("z",))
+    defVar(ds, "z", Float64, ("z",))
     ds["z"][:] = z
 
     defVar(ds, "t", Float64, ("t",))
@@ -102,12 +102,36 @@ function convert_to_nc_fields()
     defVar(ds, "q", Float64, ("x", "y", "z", "t"))
     for i in 1:length(iterations)
         iter = iterations[i]
-        ds["q"][:,:,:,i] = file["snapshots/q/$iter"]
+        ds["q"][:, :, :, i] = file["snapshots/q/$iter"]
     end
 
-    # Finally, after all the work is done, we can close the file and the dataset
+    ### --- Save restart file comprising final snapshot of q --- ###
+    restart_path = "../../output" * expt_name * "_restart.nc"
+    if isfile(restart_path); rm(restart_path); end
+    restart = NCDataset(restart_path, "c")
+    restart = NCDataset(restart_path, "a")
+    
+    defDim(restart, "x", size(x)[1])
+    defVar(restart, "x", Float64, ("x",))
+    restart["x"][:] = x
+
+    defDim(restart, "y", size(y)[1])
+    defVar(restart, "y", Float64, ("y",))
+    restart["y"][:] = y
+
+    defDim(restart, "z", size(z)[1])
+    defVar(restart, "z", Float64, ("z",))
+    restart["z"][:] = z
+
+    defVar(restart, "q", Float64, ("x", "y", "z"))
+    restart["q"][:, :, :] = ds["q"][:, :, :, end]
+
+    restart.attrib["t"] = t[end]
+
+    # Finally, after all the work is done, we can close the files
     close(file)
     close(ds)
+    close(restart)
 
     # Delete jld2 file
     rm(file_path)
@@ -159,16 +183,17 @@ function convert_to_nc_diags()
     EKE = [file["snapshots/EKE/$iteration"] for iteration in iterations]
     EKE = reduce(hcat, EKE)
 
-    D = [file["snapshots/D/$iteration"] for iteration in iterations]
-    D = reduce(hcat, D)
+    vq = [file["snapshots/vq/$iteration"] for iteration in iterations]
+    vq = reduce(hcat, vq)
 
-    l = [file["snapshots/l/$iteration"] for iteration in iterations]
-    l = reduce(hcat, l)
+    vb = [file["snapshots/vb/$iteration"] for iteration in iterations]
+    vb = reduce(hcat, vb)
+
+    qsq = [file["snapshots/qsq/$iteration"] for iteration in iterations]
+    qsq = reduce(hcat, qsq)
     
     E0 = [file["snapshots/E₀/$iteration"] for iteration in iterations]
     E1 = [file["snapshots/E₁/$iteration"] for iteration in iterations]
-    D1 = [file["snapshots/D₁/$iteration"] for iteration in iterations]
-    l1 = [file["snapshots/l₁/$iteration"] for iteration in iterations]
 
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
@@ -204,7 +229,7 @@ function convert_to_nc_diags()
     defVar(ds, "y", Float64, ("y",))
     ds["y"][:] = y
 
-    defVar(ds, "z", Int64, ("z",))
+    defVar(ds, "z", Float64, ("z",))
     ds["z"][:] = z
 
     defVar(ds, "t", Float64, ("t",))
@@ -224,23 +249,20 @@ function convert_to_nc_diags()
     defVar(ds, "EKE", Float64, ("z", "t"))
     ds["EKE"][:, :] = EKE
 
+    defVar(ds, "vq", Float64, ("z", "t"))
+    ds["vq"][:, :] = vq
+
+    defVar(ds, "vb", Float64, ("z", "t"))
+    ds["vb"][:, :] = vb
+
+    defVar(ds, "qsq", Float64, ("z", "t"))
+    ds["qsq"][:, :] = qsq
+
     defVar(ds, "E0", Float64, ("t",))
     ds["E0"][:] = E0
 
     defVar(ds, "E1", Float64, ("t",))
     ds["E1"][:] = E1
-
-    defVar(ds, "D", Float64, ("z", "t"))
-    ds["D"][:, :] = D
-
-    defVar(ds, "D1", Float64, ("t",))
-    ds["D1"][:] = D1
-
-    defVar(ds, "l", Float64, ("z", "t"))
-    ds["l"][:, :] = l
-
-    defVar(ds, "l1", Float64, ("t",))
-    ds["l1"][:] = l1
 
     # Finally, after all the work is done, we can close the file and the dataset
     close(file)

@@ -84,28 +84,14 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                   nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs_fields) * nsubs_fields
 
                   # Reset diagnostics for new nsteps
-                  # Energies
-                  E₀ = Diagnostic(Utils.BarotropicEKE, prob; nsteps)
-                  E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
                   EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
-
-                  # Diffusivity
-                  D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
-                  D = Diagnostic(Utils.PVDiffusivity, prob; nsteps)
-                        
-                  # Mixing length
-                  l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
-                  l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
-
-                  diags = [
-                        E₀,
-                        E₁,
-                        EKE,
-                        D₁,
-                        D,
-                        l₁,
-                        l
-                        ]
+                  diags = [EKE,
+                           Diagnostic(Utils.PVFlux, prob; nsteps),
+                           Diagnostic(Utils.BFlux, prob; nsteps),
+                           Diagnostic(Utils.PVVariance, prob; nsteps),
+                           Diagnostic(Utils.BarotropicEKE, prob; nsteps),
+                           Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps),
+                           ]
             end
 
             # Step forward until next diagnostic save
@@ -152,47 +138,33 @@ function start!()
       Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕₘ)
 
       else
-      # Find most recent .nc file and use as restart
-      folder = "../../output"
-      ext = "_fields.nc"
-      files = filter(f -> endswith(f, ext), readdir(folder, join = true))
-      restart_path = isempty(files) ? nothing :
-      argmax(files) do f
-      stat(f).mtime  # modification time
+        if isfile("../../output" * Params.expt_name * "_restart.nc")
+            # Set initial condition from restart file (last q snapshot)
+            restart_path = "../../output" * Params.expt_name * "_restart.nc"
+            A = device_array(grid.device)
+            file = NCDataset(restart_path, "r")
+            qi = file["q"][:, :, :]
+            MultiLevelQG.set_q!(prob, A(qi))
+            clock.t = file.attrib["t"]
+            close(file)
+        else
+            # Find most recent .nc file and use as restart file
+            folder = "../../output"
+            ext = "_fields.nc"
+            files = filter(f -> endswith(f, ext), readdir(folder, join = true))
+            restart_path = isempty(files) ? nothing :
+            argmax(files) do f
+                stat(f).mtime  # modification time
+            end
+            # Set initial condition as last output in restart file
+            A = device_array(grid.device)
+            file = NCDataset(restart_path, "r")
+            qi = file["q"][:, :, :, end]
+            MultiLevelQG.set_q!(prob, A(qi))
+            clock.t = file["t"][end]
+            close(file)
         end
-
-      # Set initial condition as last output in restart file
-      A = device_array(grid.device)
-      file = NCDataset(restart_path, "r")
-      qi = file["q"][:, :, :, end]
-      MultiLevelQG.set_q!(prob, A(qi))
-      clock.t = file["t"][end]
-      close(file)
       end
-
-      ### Define diagnostics ###
-      # Energies
-      E₀ = Diagnostic(Utils.BarotropicEKE, prob; nsteps)
-      E₁ = Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps)
-      EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
-
-      # Diffusivity
-      D₁ = Diagnostic(Utils.FirstBaroclinicDiffusivity, prob; nsteps)
-      D = Diagnostic(Utils.PVDiffusivity, prob; nsteps)
-      
-      # Mixing length
-      l₁ = Diagnostic(Utils.FirstBaroclinicMixingLength, prob; nsteps)
-      l = Diagnostic(Utils.PVMixingLength, prob; nsteps)
-
-      diags = [
-            E₀,
-            E₁,
-            EKE,
-            D₁,
-            D,
-            l₁,
-            l
-            ]
 
       filename_fields = Params.path_name[1:end-5] * "_fields" * ".jld2"
       if isfile(filename_fields); rm(filename_fields); end
@@ -204,14 +176,21 @@ function start!()
       out_fields = Output(prob, filename_fields, (:q, get_q))
 
       # Output diagnostics
+      EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
+      diags = [EKE,
+               Diagnostic(Utils.PVFlux, prob; nsteps),
+               Diagnostic(Utils.BFlux, prob; nsteps),
+               Diagnostic(Utils.PVVariance, prob; nsteps),
+               Diagnostic(Utils.BarotropicEKE, prob; nsteps),
+               Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps),
+               ]
       out_diags = Output(prob, filename_diags,
                   (:EKE, Utils.FullEKE),
+                  (:vq, Utils.PVFlux),
+                  (:vb, Utils.BFlux),
+                  (:qsq, Utils.PVVariance),
                   (:E₀, Utils.BarotropicEKE),
                   (:E₁, Utils.FirstBaroclinicEKE),
-                  (:D₁, Utils.FirstBaroclinicDiffusivity),
-                  (:D, Utils.PVDiffusivity),
-                  (:l₁, Utils.FirstBaroclinicMixingLength),
-                  (:l, Utils.PVMixingLength)
                   )
 
       simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)
