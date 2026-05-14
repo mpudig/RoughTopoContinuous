@@ -142,10 +142,11 @@ function InteriorPresFluxDiv(prob)
 
     ### Calculate
     # Assign
-    wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
-    rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
-    bh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space buoyancy (nkr, nl, nz)
-    b = A(zeros(T, nx, nx, nz))                # real space buoyancy (nx, nx, nz)
+    PresFluxDiv = A(zeros(T, nkr, nl, nz))         # pressure flux divergence (nkr, nl, nz)
+    wh = A(zeros(Complex{T}, nkr, nl, nz))         # spectral space vertical velocity (nkr, nl, nz)
+    rhsh = A(zeros(Complex{T}, nkr, nl, nz))       # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
+    bh = A(zeros(Complex{T}, nkr, nl, nz))         # spectral space buoyancy (nkr, nl, nz)
+    b = A(zeros(T, nx, nx, nz))                    # real space buoyancy (nx, nx, nz)
 
     # Buoyancy
     MultiLevelQG.bfromstreamfunction!(b, vars.ψ, params, grid)
@@ -186,10 +187,10 @@ function InteriorPresFluxDiv(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle wh for InteriorPresFluxDiv, Re[-f₀ ∂z (ŵ* ψ̂)]
+    # Re[-f₀ ∂z (ŵ* ψ̂)]
     D_wh_ψh = reshape(real(conj.(wh) .* vars.ψh), nkr * nl, nz)
     mul!(D_wh_ψh, copy(D_wh_ψh), params.D')
-    wh .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
+    PresFluxDiv .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -207,7 +208,7 @@ function InteriorPresFluxDiv(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    InteriorPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(wh, nkr * nl, nz)) # (nK, nz)
+    InteriorPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(PresFluxDiv, nkr * nl, nz)) # (nK, nz)
     
     return InteriorPresFluxDiv_iso
 end
@@ -231,6 +232,7 @@ function DragPresFluxDiv(prob)
 
     ### Calculate
     # Assign
+    PresFluxDiv = A(zeros(T, nkr, nl, nz))     # pressure flux divergence (nkr, nl, nz)
     wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
     rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
     
@@ -240,10 +242,10 @@ function DragPresFluxDiv(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle wh for DragPresFluxDiv, Re[-f₀ ∂z (ŵ* ψ̂)]
+    # Re[-f₀ ∂z (ŵ* ψ̂)]
     D_wh_ψh = reshape(real(conj.(wh) .* vars.ψh), nkr * nl, nz)
     mul!(D_wh_ψh, copy(D_wh_ψh), params.D')
-    wh .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
+    PresFluxDiv .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -261,7 +263,7 @@ function DragPresFluxDiv(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    DragPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(wh, nkr * nl, nz)) # (nK, nz)
+    DragPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(PresFluxDiv, nkr * nl, nz)) # (nK, nz)
     
     return DragPresFluxDiv_iso
 end
@@ -285,6 +287,7 @@ function TopoPresFluxDiv(prob)
 
     ### Calculate
     # Assign
+    PresFluxDiv = A(zeros(T, nkr, nl, nz))     # pressure flux divergence (nkr, nl, nz)
     wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
     rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
     
@@ -294,10 +297,10 @@ function TopoPresFluxDiv(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle wh for TopoPresFluxDiv, Re[-f₀ ∂z (ŵ* ψ̂)]
+    # Re[-f₀ ∂z (ŵ* ψ̂)]
     D_wh_ψh = reshape(real(conj.(wh) .* vars.ψh), nkr * nl, nz)
     mul!(D_wh_ψh, copy(D_wh_ψh), params.D')
-    wh .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
+    PresFluxDiv .= -params.f₀ * reshape(D_wh_ψh, nkr, nl, nz)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -315,7 +318,7 @@ function TopoPresFluxDiv(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    TopoPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(wh, nkr * nl, nz)) # (nK, nz)
+    TopoPresFluxDiv_iso = 2 * π .* K_bins .* Array(W * reshape(PresFluxDiv, nkr * nl, nz)) # (nK, nz)
     
     return TopoPresFluxDiv_iso
 end
@@ -395,10 +398,11 @@ function InteriorVertBuoyFlux(prob)
 
     ### Calculate
     # Assign
-    wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
-    rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
-    bh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space buoyancy (nkr, nl, nz)
-    b = A(zeros(T, nx, nx, nz))                # real space buoyancy (nx, nx, nz)
+    VertBuoyFlux = A(zeros(T, nkr, nl, nz))   # vertical buoyancy flux (nkr, nl, nz)
+    wh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space vertical velocity (nkr, nl, nz)
+    rhsh = A(zeros(Complex{T}, nkr, nl, nz))  # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
+    bh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space buoyancy (nkr, nl, nz)
+    b = A(zeros(T, nx, nx, nz))               # real space buoyancy (nx, nx, nz)
 
     # Buoyancy
     MultiLevelQG.bfromstreamfunction!(b, vars.ψ, params, grid)
@@ -439,8 +443,8 @@ function InteriorVertBuoyFlux(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle rhsh for InteriorVertBuoyFlux, Re[ŵ* b̂]
-    @. rhsh .= real(conj.(wh) * bh)
+    # Re[ŵ* b̂]
+    @. VertBuoyFlux .= real(conj.(wh) * bh)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -458,7 +462,7 @@ function InteriorVertBuoyFlux(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    InteriorVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(rhsh, nkr * nl, nz)) # (nK, nz)
+    InteriorVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(VertBuoyFlux, nkr * nl, nz)) # (nK, nz)
     
     return InteriorVertBuoyFlux_iso
 end
@@ -482,10 +486,11 @@ function DragVertBuoyFlux(prob)
 
     ### Calculate
     # Assign
-    wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
-    rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
-    bh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space buoyancy (nkr, nl, nz)
-    b = A(zeros(T, nx, nx, nz))                # real space buoyancy (nx, nx, nz)
+    VertBuoyFlux = A(zeros(T, nkr, nl, nz))   # vertical buoyancy flux (nkr, nl, nz)
+    wh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space vertical velocity (nkr, nl, nz)
+    rhsh = A(zeros(Complex{T}, nkr, nl, nz))  # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
+    bh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space buoyancy (nkr, nl, nz)
+    b = A(zeros(T, nx, nx, nz))               # real space buoyancy (nx, nx, nz)
 
     # Buoyancy
     MultiLevelQG.bfromstreamfunction!(b, vars.ψ, params, grid)
@@ -497,8 +502,8 @@ function DragVertBuoyFlux(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle rhsh for DragVertBuoyFlux, Re[ŵ* b̂]
-    @. rhsh .= real(conj.(wh) * bh)
+    # Re[ŵ* b̂]
+    @. VertBuoyFlux .= real(conj.(wh) * bh)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -516,7 +521,7 @@ function DragVertBuoyFlux(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    DragVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(rhsh, nkr * nl, nz)) # (nK, nz)
+    DragVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(VertBuoyFlux, nkr * nl, nz)) # (nK, nz)
     
     return DragVertBuoyFlux_iso
 end
@@ -540,10 +545,11 @@ function TopoVertBuoyFlux(prob)
 
     ### Calculate
     # Assign
-    wh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space vertical velocity (nkr, nl, nz)
-    rhsh = A(zeros(Complex{T}, nkr, nl, nz))   # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
-    bh = A(zeros(Complex{T}, nkr, nl, nz))     # spectral space buoyancy (nkr, nl, nz)
-    b = A(zeros(T, nx, nx, nz))                # real space buoyancy (nx, nx, nz)
+    VertBuoyFlux = A(zeros(T, nkr, nl, nz))   # vertical buoyancy flux (nkr, nl, nz)
+    wh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space vertical velocity (nkr, nl, nz)
+    rhsh = A(zeros(Complex{T}, nkr, nl, nz))  # spectral space vertical velocity interior forcing + boundary conditions (nkr, nl, nz)
+    bh = A(zeros(Complex{T}, nkr, nl, nz))    # spectral space buoyancy (nkr, nl, nz)
+    b = A(zeros(T, nx, nx, nz))               # real space buoyancy (nx, nx, nz)
 
     # Buoyancy
     MultiLevelQG.bfromstreamfunction!(b, vars.ψ, params, grid)
@@ -556,8 +562,8 @@ function TopoVertBuoyFlux(prob)
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
 
-    # Recycle rhsh for TopoVertBuoyFlux, Re[ŵ* b̂]
-    @. rhsh .= real(conj.(wh) * bh)
+    # Re[ŵ* b̂]
+    @. VertBuoyFlux .= real(conj.(wh) * bh)
 
     # Integrate azimuthally
     kr = grid.kr
@@ -575,7 +581,7 @@ function TopoVertBuoyFlux(prob)
     W ./= max.(reshape(counts, nK, 1), 1)                                # normalise rows
 
     K_bins = Kmin .+ (0.5 : nK) .* dK                                    # bin centres (nK,)
-    TopoVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(rhsh, nkr * nl, nz)) # (nK, nz)
+    TopoVertBuoyFlux_iso = 2 * π .* K_bins .* Array(W * reshape(VertBuoyFlux, nkr * nl, nz)) # (nK, nz)
     
     return TopoVertBuoyFlux_iso
 end
