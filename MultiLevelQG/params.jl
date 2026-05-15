@@ -33,7 +33,7 @@ nz = 12              # number of z grid points
     	### Control parameters ###
 
 r_star = 0.4		  # nondimensional drag coefficient, r* = f₀λr/UH
-h_star = 1.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
+h_star = 0.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
 β_star = 0.			  # nondimensional beta, β* = βλ²/U
 m = 1.                # vertical mode number to project shear onto
 
@@ -67,7 +67,7 @@ U = U₀ .* ϕₘ .- (U₀ * ϕₘ[end]) 	             # background zonal shear 
       	### Topography ###
 
 Ktopo = Kd															# minimum topographic wavenumber [m-1]
-h = 0 .* Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
+h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
 
       	### Time stepping ###
 
