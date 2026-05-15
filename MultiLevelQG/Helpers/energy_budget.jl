@@ -182,7 +182,7 @@ function InteriorPresFluxDiv(prob)
 
     # Mean flow part
     ∂zU = reshape(reshape(params.U, nl, nz) * params.D', 1, nl, nz)[:, :, 2 : end - 1]
-    @views rhsh[:, :, 2 : end - 1] .+= -2 * params.f₀ * ∂zU .* grid.Krsq .* vars.ψh[:, :, 2 : end - 1]
+    @views rhsh[:, :, 2 : end - 1] .+= -2 * params.f₀ * ∂zU .* grid.Krsq .* vars.vh[:, :, 2 : end - 1]
 
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
@@ -438,7 +438,7 @@ function InteriorVertBuoyFlux(prob)
 
     # Mean flow part
     ∂zU = reshape(reshape(params.U, nl, nz) * params.D', 1, nl, nz)[:, :, 2 : end - 1]
-    @views rhsh[:, :, 2 : end - 1] .+= -2 * params.f₀ * ∂zU .* grid.Krsq .* vars.ψh[:, :, 2 : end - 1]
+    @views rhsh[:, :, 2 : end - 1] .+= -2 * params.f₀ * ∂zU .* grid.Krsq .* vars.vh[:, :, 2 : end - 1]
 
     # Vertical velocity
     MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
