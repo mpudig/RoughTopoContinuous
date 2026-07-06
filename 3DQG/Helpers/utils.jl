@@ -94,7 +94,7 @@ end
 """
         set_initial_condition!(prob, grid, K0, E0, ϕₘ)
 
-        Sets the initial condition of MultiLayerQG to be a random q(x,y) field with baroclinic structure ϕₘ
+        Sets the initial condition of QG3D problem to be a random q(x,y) field with baroclinic structure ϕₘ
         and with energy localized in spectral space about K = K₀ and with total energy equal to E₀
 """
 function set_initial_condition!(prob, K0, E0, ϕₘ)
@@ -165,15 +165,15 @@ function set_initial_condition!(prob, K0, E0, ϕₘ)
 
     # Invert psih to get qh, then transform qh to real space qh
     qh = A(zeros(nk, nl, nz)) .* im
-    MultiLevelQG.pvfromstreamfunction!(qh, psih, params, grid)
+    QG3D.pvfromstreamfunction!(qh, psih, params, grid)
 
     q = A(zeros(nx, nx, nz))
-    MultiLevelQG.invtransform!(q, qh, params)
+    QG3D.invtransform!(q, qh, params)
     CUDA.@allowscalar q[:, :, 1] .= 0           # b|z=0 = 0 exactly
     CUDA.@allowscalar q[:, :, end] .= 0         # b|z=-H = 0 exactly
 
     # Set as initial condition
-    MultiLevelQG.set_q!(prob, q)
+    QG3D.set_q!(prob, q)
 end
 
 """
@@ -268,13 +268,13 @@ function FullEKE(prob)
     nz = params.nlevels			   # number of levels
 
     @. vars.qh = sol
-    MultiLevelQG.streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
+    QG3D.streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
 
     @. vars.uh = -im * grid.l  * vars.ψh
     @. vars.vh =  im * grid.kr * vars.ψh
 
-    MultiLevelQG.invtransform!(vars.u, vars.uh, params)
-    MultiLevelQG.invtransform!(vars.v, vars.vh, params)
+    QG3D.invtransform!(vars.u, vars.uh, params)
+    QG3D.invtransform!(vars.v, vars.vh, params)
 
 	u = view(vars.u, :, :, :)	   # interior zonal velocity (nx, ny, nz)
 	v = view(vars.v, :, :, :)	   # interior meridional velocity (nx, ny, nz)
@@ -300,7 +300,7 @@ function BFlux(prob)
         B = device_array(CPU())
 
 	b = similar(vars.q)
-	MultiLevelQG.bfromstreamfunction!(b, vars.ψ, params, grid)
+	QG3D.bfromstreamfunction!(b, vars.ψ, params, grid)
         vb = dropdims(mean(vars.v .* b, dims = (1, 2)), dims = (1, 2))     # meridional buoyancy flux profile (nz)
 
         return B(vb)
@@ -406,8 +406,8 @@ function w_topo(prob)
     @views rhsh[:, :, end] .+= im * grid.kr .* rfft(vars.u[:, :, end] .* params.eta) .+
                                im * grid.l  .* rfft(vars.v[:, :, end] .* params.eta)
     # Vertical velocity
-    MultiLevelQG.omegaeqn!(wh, rhsh, params, grid)
-    MultiLevelQG.invtransform!(w, wh, params)
+    QG3D.omegaeqn!(wh, rhsh, params, grid)
+    QG3D.invtransform!(w, wh, params)
     
     return w
 end

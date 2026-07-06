@@ -38,9 +38,11 @@ function convert_to_nc_fields()
     H0 = Params.H₀
     r = Params.r
     U0 = Params.U₀
+    V0 = Params.V₀
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
+    V = Params.V
     N2 = Params.N²
 
     # Time and diagnostics
@@ -66,6 +68,7 @@ function convert_to_nc_fields()
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
     ds.attrib["U0"] = U0
+    ds.attrib["V0"] = V0
 
     # Define the dimensions, with names and sizes
 
@@ -98,6 +101,9 @@ function convert_to_nc_fields()
 
     defVar(ds, "U", Float64, ("z",))
     ds["U"][:] = U
+
+    defVar(ds, "V", Float64, ("z",))
+    ds["V"][:] = V
 
     defVar(ds, "q", Float64, ("x", "y", "z", "t"))
     for i in 1:length(iterations)
@@ -170,9 +176,11 @@ function convert_to_nc_diags()
     H0 = Params.H₀
     r = Params.r
     U0 = Params.U₀
+    V0 = Params.V₀
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
+    V = Params.V
     N2 = Params.N²
 
     # Time and diagnostics
@@ -213,6 +221,7 @@ function convert_to_nc_diags()
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
     ds.attrib["U0"] = U0
+    ds.attrib["V0"] = V0
 
     # Define the dimensions, with names and sizes
 
@@ -245,6 +254,9 @@ function convert_to_nc_diags()
 
     defVar(ds, "U", Float64, ("z",))
     ds["U"][:] = U
+
+    defVar(ds, "V", Float64, ("z",))
+    ds["V"][:] = V
 
     defVar(ds, "EKE", Float64, ("z", "t"))
     ds["EKE"][:, :] = EKE

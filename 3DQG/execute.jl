@@ -32,6 +32,7 @@ H₀ = Params.H₀
 r = Params.r
 N² = Params.N²
 U = Params.U
+V = Params.V
 
 eta = Params.h
 
@@ -96,7 +97,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
 
             # Step forward until next diagnostic save
             stepforward!(prob, diags, nsubs_diags)
-            MultiLevelQG.updatevars!(prob)
+            QG3D.updatevars!(prob)
             
             # Save at diagnostic frequency
             saveoutput(out_diags)
@@ -112,23 +113,17 @@ end
       ### Get real space solution ###
 
 function get_q(prob)
-      sol, params, vars, grid = prob.sol, prob.params, prob.vars, prob.grid
-
+      vars = prob.vars
       # We want to save CPU arrays not GPU arrays
-      A = device_array(GPU())
       B = device_array(CPU())
 
-      q = A(zeros(size(vars.q)))
-      qh = prob.sol
-      MultiLevelQG.invtransform!(q, qh, params)
-
-      return B(q)
+      return B(vars.q)
 end
 
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = MultiLevelQG.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, N², eta, r, dt, stepper, aliased_fraction = 0)
+      prob = QG3D.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, V, N², eta, r, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
       ### Set initial condition ###
@@ -144,7 +139,7 @@ function start!()
             A = device_array(grid.device)
             file = NCDataset(restart_path, "r")
             qi = file["q"][:, :, :]
-            MultiLevelQG.set_q!(prob, A(qi))
+            QG3D.set_q!(prob, A(qi))
             clock.t = file.attrib["t"]
             close(file)
         else
@@ -160,7 +155,7 @@ function start!()
             A = device_array(grid.device)
             file = NCDataset(restart_path, "r")
             qi = file["q"][:, :, :, end]
-            MultiLevelQG.set_q!(prob, A(qi))
+            QG3D.set_q!(prob, A(qi))
             clock.t = file["t"][end]
             close(file)
         end

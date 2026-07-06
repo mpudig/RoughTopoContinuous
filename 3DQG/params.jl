@@ -1,4 +1,4 @@
-### Parameters for multi-level QG turbulence simulations with small-scale topography ###
+### Parameters for 3D QG turbulence simulations with small-scale topography ###
 
 module Params
 
@@ -38,7 +38,7 @@ nz = 24              # number of z grid points
     	### Control parameters ###
 
 r_star = 0.2		  # nondimensional drag coefficient, r* = f₀λr/UH
-h_star = 0.           # nondimensional advection-topography, h* = f₀h₀/UHKₜ
+h_star = 0.            # nondimensional advection-topography, h* = f₀h₀/UHKₜ
 β_star = 0.			  # nondimensional beta, β* = βλ²/U
 δ = 0.25              # stratification scale height if N²(z) = N²₀ exp(z / δH₀) (ignored if strat_type = LinStrat)
 m = 1.                # vertical mode number to project shear onto
@@ -61,7 +61,8 @@ z = H₀ / 2 .* (ξ .- 1)                                      # maps [-1, 1] ->
 
     	### Background scalar parameters ###
 
-U₀ = 1e-2                             # baroclinic shear [m s-1]
+U₀ = 1e-2                             # zonal baroclinic shear [m s-1]
+V₀ = 0.                               # meridional baroclinic shear [m s-1]
 f₀ = 1e-4                             # constant Coriolis [s-1]
 β = U₀ * β_star / Ldm^2			      # y gradient of Coriolis [m-1 s-1]
 r = U₀ * H₀ / (f₀ * Ldm) * r_star     # linear drag [m]
@@ -81,7 +82,8 @@ else
 end	
 
 U = U₀ .* ϕₘ .- (U₀ * ϕₘ[end]) 	             # background zonal shear projected onto baroclinic mode (with barotropic shift such that U(-H) = 0) [m s-1]
-   
+V = V₀ .* ϕₘ .- (V₀ * ϕₘ[end])               # background meridional shear projected onto baroclinic mode (with barotropic shift such that V(-H) = 0) [m s-1]    
+
       	### Topography ###
 
 Ktopo = Kd															# minimum topographic wavenumber [m-1]
