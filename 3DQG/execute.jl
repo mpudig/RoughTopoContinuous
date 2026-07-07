@@ -29,7 +29,7 @@ Lx = Params.Lx
 f₀ = Params.f₀
 β = Params.β
 H₀ = Params.H₀
-r = Params.r
+cd = Params.cd
 N² = Params.N²
 U = Params.U
 V = Params.V
@@ -75,7 +75,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
             end
 
             # If cfl is close to unstable value, halve the time step and reset the problem with initial condition at last time step
-            if cfl > 0.85
+            if cfl > 0.8
 
                   # Reset time stepping variables
                   dt = clock.dt / 2
@@ -91,7 +91,6 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                            Diagnostic(Utils.BFlux, prob; nsteps),
                            Diagnostic(Utils.PVVariance, prob; nsteps),
                            Diagnostic(Utils.BarotropicEKE, prob; nsteps),
-                           Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps),
                            ]
             end
 
@@ -123,7 +122,7 @@ end
       ### Initialize and then call step forward function ###
 
 function start!()
-      prob = QG3D.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, V, N², eta, r, dt, stepper, aliased_fraction = 0)
+      prob = QG3D.Problem(nlevels, dev; nx, Lx, f₀, β, H₀, U, V, N², eta, cd, dt, stepper, aliased_fraction = 0)
       sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
       ### Set initial condition ###
@@ -177,7 +176,6 @@ function start!()
                Diagnostic(Utils.BFlux, prob; nsteps),
                Diagnostic(Utils.PVVariance, prob; nsteps),
                Diagnostic(Utils.BarotropicEKE, prob; nsteps),
-               Diagnostic(Utils.FirstBaroclinicEKE, prob; nsteps),
                ]
       out_diags = Output(prob, filename_diags,
                   (:EKE, Utils.FullEKE),
@@ -185,7 +183,6 @@ function start!()
                   (:vb, Utils.BFlux),
                   (:qsq, Utils.PVVariance),
                   (:E₀, Utils.BarotropicEKE),
-                  (:E₁, Utils.FirstBaroclinicEKE),
                   )
 
       simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, dtsnap_diags, dtsnap_fields, nsubs_diags, nsubs_fields)

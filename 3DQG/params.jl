@@ -1,4 +1,4 @@
-### Parameters for 3D QG turbulence simulations with small-scale topography ###
+### Parameters for 3D QG turbulence simulations driven by mean fields/topography from GLORYS12v1 reanalysis ###
 
 module Params
 
@@ -7,96 +7,63 @@ dir = pwd()
 include(dir * "/Helpers/utils.jl")
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff
+using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff, JLD2, NCDatasets
 
 # local import
 import .Utils
 
 		### Save path and device ###
-
-# format: nz = ..., r = ..., h = ...
-root = "/scratch/mp6191/RoughTopoContinuous/"
-expt_name = "/nz24_r02_h0"
-
-strat_types = ["LinStrat", "ExpStrat"]  # type of stratification (and corresponding baroclinic shear)
-strat_type = strat_types[1]
+root = "/scratch/mp6191/RoughTopoContinuous/Glorys"
+expt_name = "/region"
 
 restart_num = 0
 if restart_num == 0
-path_name = root * strat_type * expt_name * "/output" * expt_name * ".jld2"
+path_name = root * expt_name * "/output" * expt_name * ".jld2"
 else
-path_name = root * strat_type * expt_name * "/output" * expt_name * "_restart$restart_num" * ".jld2"
+path_name = root * expt_name * "/output" * expt_name * "_restart$restart_num" * ".jld2"
 end
 
 dev = GPU() # or CPU()
 
+        ### Read in mean fields ###
+mean_fields = NCDataset(root * expt_name * "/input" * "/mean_fields.nc", "r")
+
+# Fields
+U = mean_fields["U"][:]
+V = mean_fields["V"][:]
+N² = mean_fields["N2"][:]
+h = mean_fields["h"][:, :]
+
+# Coordinates
+x = mean_fields["x"][:]
+y = mean_fields["y"][:]
+z = mean_fields["z"][:]
+
+# Attribs
+f₀ = mean_fields.attrib["f0"]
+β = mean_fields.attrib["beta"]
+H₀ = mean_fields.attrib["H0"]
+Ld = mean_fields.attrib["Ld"]
+
 		### Resolution ###
 
-nx = 512             # number of x, y grid points
-nz = 24              # number of z grid points
+nx = length(x)       # number of x, y grid points
+nz = length(z)       # number of z grid points
 
-    	### Control parameters ###
+    	### Domain scalar parameters ###
 
-r_star = 0.2		  # nondimensional drag coefficient, r* = f₀λr/UH
-h_star = 0.            # nondimensional advection-topography, h* = f₀h₀/UHKₜ
-β_star = 0.			  # nondimensional beta, β* = βλ²/U
-δ = 0.25              # stratification scale height if N²(z) = N²₀ exp(z / δH₀) (ignored if strat_type = LinStrat)
-m = 1.                # vertical mode number to project shear onto
-
-if m != 1 && strat_type == "ExpStrat"
-    error("ExpStrat is currently hardcoded to have only first baroclinic structure.")
-end
-
-		### Domain ###
-
-Ld = 20e3           # first baroclinic deformation radius [m]
-Ldm = Ld / m	    # mth baroclinic deformation radius [m]
-Kd = 1 / Ld         # baroclinic deformation wavenumber [m-1]
-ld = 2 * pi * Ld    # baroclinic deformation wavelength [m]
-Lx = 15 * ld        # side length of square domain [m]
-
-H₀ = 4000.                                                  # total mean depth [m]
-ξ = [cos((i - 1) * pi / (nz - 1)) for i in 1 : nz]          # Chebyshev grid on [-1, 1]
-z = H₀ / 2 .* (ξ .- 1)                                      # maps [-1, 1] -> [-H₀, 0]
-
-    	### Background scalar parameters ###
-
-U₀ = 1e-2                             # zonal baroclinic shear [m s-1]
-V₀ = 0.                               # meridional baroclinic shear [m s-1]
-f₀ = 1e-4                             # constant Coriolis [s-1]
-β = U₀ * β_star / Ldm^2			      # y gradient of Coriolis [m-1 s-1]
-r = U₀ * H₀ / (f₀ * Ldm) * r_star     # linear drag [m]
-
-		### Background profiles ###
-
-if strat_type == "LinStrat"	
-	N₀ = Utils.LinStratN(f₀, H₀, Ld)	          # buoyancy frequency magnitude for given deformation radius, etc [s-1]
-	N² = N₀^2 .* ones(nz)                 	      # background constant N₀^2 at Chebyshev levels [s-2]
-	ϕₘ = sqrt(2) * cos.(m * N₀ / (Ld * f₀) * z)   # mth baroclinic vertical mode at Chebyshev levels
-
-else
-    a₁ = Utils.ExpStratEigval1(δ)				  # first baroclinic eigenvalue for exponential stratifcation and given δ [unitless]
-    N₀ = Utils.ExpStratN(f₀, H₀, Ld, δ, a₁)	      # buoyancy frequency magnitude for given deformation radius, etc [s-1]
-	N² = N₀^2 .* exp.(z ./ (δ * H₀))              # background exponential N₀^2 at Chebyshev levels [s-2]
-	ϕₘ = Utils.ExpStratPhi1(z, δ, H₀, a₁)         # first baroclinic vertical mode at Chebyshev levels (need to work out how to compute mth mode later!)
-end	
-
-U = U₀ .* ϕₘ .- (U₀ * ϕₘ[end]) 	             # background zonal shear projected onto baroclinic mode (with barotropic shift such that U(-H) = 0) [m s-1]
-V = V₀ .* ϕₘ .- (V₀ * ϕₘ[end])               # background meridional shear projected onto baroclinic mode (with barotropic shift such that V(-H) = 0) [m s-1]    
-
-      	### Topography ###
-
-Ktopo = Kd															# minimum topographic wavenumber [m-1]
-h = Utils.GoffJordanTopo(h_star, f₀, U₀, H₀, Ktopo, Lx, nx, dev)	# random Goff Jordan topography [m]
+Lx = x[end]            # square domain side length
+cd = 0.003 		       # quadratic drag used by model
 
       	### Time stepping ###
 
-Ti = Ld / U₀                         # nondimensional time
-tmax = 300 * Ti                      # final time [s]
-dt = 60*60*8                         # time step [s]
+Umax = max(maximum(U), maximum(V))    # rough magnitude of mean shear
+Ti = Ld / Umax                        # nondimensional time
+tmax = 300 * Ti                       # final time [s]
+dt = 60 * 60 * 4                      # initial time step [s]
 
-dtsnap_diags = Ti                    # snapshot frequency for diagnostics [s]
-dtsnap_fields = 10 * dtsnap_diags    # snapshot frequency for fields [s]
+dtsnap_diags = 5 * 86400             # snapshot frequency for diagnostics [s]
+dtsnap_fields = 15 * 86400           # snapshot frequency for fields [s]
 
 nsubs_diags = Int(floor(dtsnap_diags / dt))       # number of time steps between snapshots for saving diagnostics
 nsubs_fields = Int(floor(dtsnap_fields / dt))     # number of time steps between snapshots for saving fields

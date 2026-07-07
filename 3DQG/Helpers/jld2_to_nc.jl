@@ -36,9 +36,7 @@ function convert_to_nc_fields()
     beta = Params.β
     z = Params.z
     H0 = Params.H₀
-    r = Params.r
-    U0 = Params.U₀
-    V0 = Params.V₀
+    cd = Params.cd
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
@@ -64,11 +62,9 @@ function convert_to_nc_fields()
     ds.attrib["dt"] = dt
     ds.attrib["f0"] = f0
     ds.attrib["beta"] = beta
-    ds.attrib["r"] = r
+    ds.attrib["cd"] = cd
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
-    ds.attrib["U0"] = U0
-    ds.attrib["V0"] = V0
 
     # Define the dimensions, with names and sizes
 
@@ -174,9 +170,7 @@ function convert_to_nc_diags()
     beta = Params.β
     z = Params.z
     H0 = Params.H₀
-    r = Params.r
-    U0 = Params.U₀
-    V0 = Params.V₀
+    cd = Params.cd
     Ld = Params.Ld
     htop = Params.h
     U = Params.U
@@ -201,7 +195,6 @@ function convert_to_nc_diags()
     qsq = reduce(hcat, qsq)
     
     E0 = [file["snapshots/E₀/$iteration"] for iteration in iterations]
-    E1 = [file["snapshots/E₁/$iteration"] for iteration in iterations]
 
     # This creates a new NetCDF file
     # The mode "c" stands for creating a new file (clobber); the mode "a" stands for opening in write mode
@@ -217,11 +210,9 @@ function convert_to_nc_diags()
     ds.attrib["dt"] = dt
     ds.attrib["f0"] = f0
     ds.attrib["beta"] = beta
-    ds.attrib["r"] = r
+    ds.attrib["cd"] = cd
     ds.attrib["H"] = H0
     ds.attrib["Ld"] = Ld
-    ds.attrib["U0"] = U0
-    ds.attrib["V0"] = V0
 
     # Define the dimensions, with names and sizes
 
@@ -272,9 +263,6 @@ function convert_to_nc_diags()
 
     defVar(ds, "E0", Float64, ("t",))
     ds["E0"][:] = E0
-
-    defVar(ds, "E1", Float64, ("t",))
-    ds["E1"][:] = E1
 
     # Finally, after all the work is done, we can close the file and the dataset
     close(file)
