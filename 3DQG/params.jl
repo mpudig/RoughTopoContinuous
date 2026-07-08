@@ -29,21 +29,21 @@ dev = GPU() # or CPU()
 mean_fields = NCDataset(root * expt_name * "/input" * "/mean_fields.nc", "r")
 
 # Fields
-U = mean_fields["U"][:]
-V = mean_fields["V"][:]
-N² = mean_fields["N2"][:]
-h = mean_fields["h"][:, :]
+U = Float64.(mean_fields["U"][:])
+V = Float64.(mean_fields["V"][:])
+N² = Float64.(mean_fields["N2"][:])
+h = Float64.(mean_fields["h"][:, :])
 
 # Coordinates
-x = mean_fields["x"][:]
-y = mean_fields["y"][:]
-z = mean_fields["z"][:]
+x = Float64.(mean_fields["x"][:])
+y = Float64.(mean_fields["y"][:])
+z = Float64.(mean_fields["z"][:])
 
 # Attribs
-f₀ = mean_fields.attrib["f0"]
-β = mean_fields.attrib["beta"]
-H₀ = mean_fields.attrib["H0"]
-Ld = mean_fields.attrib["Ld"]
+f₀ = Float64(mean_fields.attrib["f0"])
+β = Float64(mean_fields.attrib["beta"])
+H₀ = Float64(mean_fields.attrib["H0"])
+Ld = Float64(mean_fields.attrib["Ld"])
 
 		### Resolution ###
 
@@ -60,7 +60,7 @@ cd = 0.003 		       # quadratic drag used by model
 Umax = max(maximum(U), maximum(V))    # rough magnitude of mean shear
 Ti = Ld / Umax                        # nondimensional time
 tmax = 300 * Ti                       # final time [s]
-dt = 60 * 60 * 4                      # initial time step [s]
+dt = 60 * 60                          # initial time step [s]
 
 dtsnap_diags = 5 * 86400             # snapshot frequency for diagnostics [s]
 dtsnap_fields = 15 * 86400           # snapshot frequency for fields [s]
@@ -75,7 +75,9 @@ stepper = "FilteredRK4"              # timestepper
 
 			### Initial condition ###
 
-K0 = 1 / (4 * Ld)          # most unstable Eady wavenumber, Km = 2 * pi / (4 * Ld) (see Vallis text)
-E0 = 1e-3                  # initial energy [m2 s-2]
+K0 = 1 / (4 * Ld)                                 # most unstable Eady wavenumber, Km = 2 * pi / (4 * Ld) (see Vallis text)
+E0 = 1e-3                                         # initial energy [m2 s-2]
+ϕ₁ = Utils.first_baroclinic_mode(f₀, H₀, N², nz)  # first baroclinic mode                         
 
+close(mean_fields)
 end

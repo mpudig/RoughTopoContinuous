@@ -75,7 +75,7 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
             end
 
             # If cfl is close to unstable value, halve the time step and reset the problem with initial condition at last time step
-            if cfl > 0.8
+            if cfl > 0.5
 
                   # Reset time stepping variables
                   dt = clock.dt / 2
@@ -129,7 +129,7 @@ function start!()
 
       if restart_num == 0
       # Baroclinic vertical structure with initial field at most unstable wavelength
-      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕₘ)
+      Utils.set_initial_condition!(prob, Params.K0, Params.E0, Params.ϕ₁)
 
       else
         if isfile("../../output" * Params.expt_name * "_restart.nc")

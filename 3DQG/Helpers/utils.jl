@@ -3,7 +3,7 @@
 module Utils
 
 # compile other packages
-using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff
+using GeophysicalFlows, FFTW, Statistics, Random, CUDA, CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler, SpecialFunctions, ForwardDiff, LinearAlgebra
 using FourierFlows: parsevalsum
 
 """
@@ -251,6 +251,78 @@ function ExpStratPhi1(z, δ, H₀, a₁)
     norm = sqrt(sum(weights .* ϕ₁(z).^2))
 
 	return ϕ₁(z) / norm
+end
+
+"""
+        first_baroclinic_mode(f₀, H₀, N², nz)
+Returns the first baroclinic mode, given N², f₀, H₀
+"""
+function first_baroclinic_mode(f₀, H₀, N², nz)
+    # Chebyshev grid and differentiation matrix
+    ζ = [cos(i * π / (nz - 1)) for i in 0:nz-1]
+    c = ones(nz); c[1] = 2; c[end] = 2
+    D = zeros(nz, nz)
+    for i in 1:nz, j in 1:nz
+        if i != j
+            D[i, j] = (c[i] / c[j]) * (-1.0)^(i + j) / (ζ[i] - ζ[j])
+        end
+    end
+    for i in 1:nz
+        D[i, i] = -sum(D[i, j] for j in 1:nz if j != i)
+    end
+    D .*= 2 / H₀
+
+    # Stretching operator: L = D * diag(f0^2/N2) * D
+    L = D * Diagonal(f₀^2 ./ N²) * D
+
+    # Neumann BC bordering (d/dz phi = 0 at z=0, z=-H)
+    L_bc = copy(L)
+    L_bc[1, :]   = D[1, :]
+    L_bc[end, :] = D[end, :]
+    B = Matrix{Float64}(I, nz, nz)
+    B[1, :]   .= 0.0
+    B[end, :] .= 0.0
+
+    # Generalized eigenproblem: L_bc*phi = -lambda^2 * B*phi
+    F = eigen(L_bc, B)
+    vals, vecs = F.values, F.vectors
+
+    finite0 = isfinite.(vals)
+    tol = 1e-8 * maximum(abs.(vals[finite0]))
+    mask = finite0 .& (real.(vals) .< tol)
+    lambda2 = -real.(vals[mask])
+    modes   =  real.(vecs[:, mask])
+
+    idx = sortperm(lambda2)
+    lambda2 = lambda2[idx]
+    modes   = modes[:, idx]
+
+    # Clenshaw-Curtis quadrature weights on [-H0, 0]
+    cc = zeros(nz)
+    cc[1:2:end] = 2.0 ./ (1 .- (0:2:nz-1).^2)
+    w = real.(ifft(vcat(cc, cc[end-1:-1:2])))[1:nz]
+    w[1]   /= 2
+    w[end] /= 2
+    weights = w * H₀
+
+    inner(u, v) = dot(u, weights .* v) / H₀
+
+    # Only need modes 1 (barotropic) and 2 (first baroclinic) for Gram-Schmidt
+    for m in 1:2
+        mode = modes[:, m]
+        for j in 1:(m - 1)
+            mode .-= inner(mode, modes[:, j]) .* modes[:, j]
+        end
+        mode ./= sqrt(inner(mode, mode))
+        if mode[1] < 0
+            mode .*= -1
+        end
+        modes[:, m] = mode
+    end
+
+    ϕ₁ = modes[:, 2]
+    
+    return ϕ₁
 end
 
 
