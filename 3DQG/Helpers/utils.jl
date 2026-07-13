@@ -356,9 +356,8 @@ function FullEKE(prob)
 	return B(E)
 end
 
-function PVFlux(prob)
+function PVFluxMeridional(prob)
 	vars, params, grid = prob.vars, prob.params, prob.grid
-	A = device_array(grid.device)
 	B = device_array(CPU())
 
 	vq = dropdims(mean(vars.v .* vars.q, dims = (1, 2)), dims = (1, 2))	# meridional PV flux profile (nz)
@@ -366,16 +365,35 @@ function PVFlux(prob)
 	return B(vq)
 end
 
-function BFlux(prob)
-        vars, params, grid = prob.vars, prob.params, prob.grid
-        A = device_array(grid.device)
-        B = device_array(CPU())
+function BFluxMeridional(prob)
+    vars, params, grid = prob.vars, prob.params, prob.grid
+    B = device_array(CPU())
 
 	b = similar(vars.q)
 	QG3D.bfromstreamfunction!(b, vars.ψ, params, grid)
-        vb = dropdims(mean(vars.v .* b, dims = (1, 2)), dims = (1, 2))     # meridional buoyancy flux profile (nz)
+    vb = dropdims(mean(vars.v .* b, dims = (1, 2)), dims = (1, 2))     # meridional buoyancy flux profile (nz)
 
-        return B(vb)
+    return B(vb)
+end
+
+function PVFluxZonal(prob)
+	vars, params, grid = prob.vars, prob.params, prob.grid
+	B = device_array(CPU())
+
+	uq = dropdims(mean(vars.u .* vars.q, dims = (1, 2)), dims = (1, 2))	# zonal PV flux profile (nz)
+
+	return B(uq)
+end
+
+function BFluxZonal(prob)
+    vars, params, grid = prob.vars, prob.params, prob.grid
+    B = device_array(CPU())
+
+	b = similar(vars.q)
+	QG3D.bfromstreamfunction!(b, vars.ψ, params, grid)
+    ub = dropdims(mean(vars.u .* b, dims = (1, 2)), dims = (1, 2))     # zonal buoyancy flux profile (nz)
+
+    return B(ub)
 end
 
 function PVVariance(prob)

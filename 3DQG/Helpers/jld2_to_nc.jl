@@ -188,8 +188,14 @@ function convert_to_nc_diags()
     vq = [file["snapshots/vq/$iteration"] for iteration in iterations]
     vq = reduce(hcat, vq)
 
+    uq = [file["snapshots/uq/$iteration"] for iteration in iterations]
+    uq = reduce(hcat, uq)
+
     vb = [file["snapshots/vb/$iteration"] for iteration in iterations]
     vb = reduce(hcat, vb)
+
+    ub = [file["snapshots/ub/$iteration"] for iteration in iterations]
+    ub = reduce(hcat, ub)
 
     qsq = [file["snapshots/qsq/$iteration"] for iteration in iterations]
     qsq = reduce(hcat, qsq)
@@ -255,8 +261,14 @@ function convert_to_nc_diags()
     defVar(ds, "vq", Float64, ("z", "t"))
     ds["vq"][:, :] = vq
 
+    defVar(ds, "uq", Float64, ("z", "t"))
+    ds["uq"][:, :] = uq
+
     defVar(ds, "vb", Float64, ("z", "t"))
     ds["vb"][:, :] = vb
+
+    defVar(ds, "ub", Float64, ("z", "t"))
+    ds["ub"][:, :] = ub
 
     defVar(ds, "qsq", Float64, ("z", "t"))
     ds["qsq"][:, :] = qsq

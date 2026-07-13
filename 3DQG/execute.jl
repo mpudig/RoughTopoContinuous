@@ -87,8 +87,10 @@ function simulate!(prob, grid, diags, EKE, out_fields, out_diags, tmax, nsteps, 
                   # Reset diagnostics for new nsteps
                   EKE = Diagnostic(Utils.FullEKE, prob; nsteps)
                   diags = [EKE,
-                           Diagnostic(Utils.PVFlux, prob; nsteps),
-                           Diagnostic(Utils.BFlux, prob; nsteps),
+                           Diagnostic(Utils.PVFluxMeridional, prob; nsteps),
+                           Diagnostic(Utils.PVFluxZonal, prob; nsteps),
+                           Diagnostic(Utils.BFluxMeridional, prob; nsteps),
+                           Diagnostic(Utils.BFluxZonal, prob; nsteps),
                            Diagnostic(Utils.PVVariance, prob; nsteps),
                            Diagnostic(Utils.BarotropicEKE, prob; nsteps),
                            ]
@@ -179,8 +181,10 @@ function start!()
                ]
       out_diags = Output(prob, filename_diags,
                   (:EKE, Utils.FullEKE),
-                  (:vq, Utils.PVFlux),
-                  (:vb, Utils.BFlux),
+                  (:vq, Utils.PVFluxMeridional),
+                  (:uq, Utils.PVFluxZonal),
+                  (:vb, Utils.BFluxMeridional),
+                  (:ub, Utils.BFluxZonal),
                   (:qsq, Utils.PVVariance),
                   (:E₀, Utils.BarotropicEKE),
                   )
